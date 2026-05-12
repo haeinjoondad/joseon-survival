@@ -12,6 +12,7 @@ import { PromotionPanel } from './components/PromotionPanel'
 import { OfflineRewardModal } from './components/OfflineRewardModal'
 import { EventModal, EventResultModal } from './components/EventModal'
 import { CharacterDisplay } from './components/CharacterDisplay'
+import { PromotionGoalPanel } from './components/PromotionGoalPanel'
 import { GameOverScreen } from './components/GameOverScreen'
 import { TutorialBanner } from './components/TutorialBanner'
 import { PromotionCelebration } from './components/PromotionCelebration'
@@ -155,6 +156,11 @@ export default function App() {
 
       {/* 캐릭터 표시 영역 */}
       <CharacterDisplay player={player} />
+
+      <PromotionGoalPanel
+        player={player}
+        onOpenPromotion={() => handleTabChange('promotion')}
+      />
 
       {/* 튜토리얼 배너 */}
       <TutorialBanner
