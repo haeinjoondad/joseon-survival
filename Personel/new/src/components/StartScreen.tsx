@@ -1,10 +1,12 @@
 import { useState } from 'react'
+import type { ReactNode } from 'react'
 
 interface Props {
   onStart: (name: string) => void
+  authPanel?: ReactNode
 }
 
-export function StartScreen({ onStart }: Props) {
+export function StartScreen({ onStart, authPanel }: Props) {
   const [name, setName] = useState('')
 
   return (
@@ -31,9 +33,11 @@ export function StartScreen({ onStart }: Props) {
             onClick={() => onStart(name)}
             className="w-full bg-amber-700 hover:bg-amber-600 active:bg-amber-800 text-hanji font-bold py-3 rounded transition-colors"
           >
-            임용장을 받다
+            게스트로 임용장을 받다
           </button>
         </div>
+
+        {authPanel}
 
         <p className="text-stone-600 text-xs mt-6">
           조선시대 관료제를 현대 직장인 감성으로 재해석한<br />풍자 방치 생존 게임

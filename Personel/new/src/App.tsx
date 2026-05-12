@@ -1,7 +1,10 @@
 import { useState } from 'react'
 import { useGameStore } from './store/useGameStore'
+import { useAuth } from './store/useAuth'
 import { useTutorial } from './store/useTutorial'
 import { StartScreen } from './components/StartScreen'
+import { AuthPanel } from './components/AuthPanel'
+import { AccountPanel } from './components/AccountPanel'
 import { StatusBar } from './components/StatusBar'
 import { WorkPanel } from './components/WorkPanel'
 import { StatsPanel } from './components/StatsPanel'
@@ -29,6 +32,7 @@ const TUTORIAL_TAB_HIGHLIGHT: Record<string, TabType> = {
 }
 
 export default function App() {
+  const auth = useAuth()
   const {
     player,
     offlineReward,
@@ -48,14 +52,31 @@ export default function App() {
     resetGame,
     promotionCelebration,
     dismissPromotion,
-  } = useGameStore()
+    saveConflict,
+    cloudStatus,
+    useGuestSaveForAccount,
+    useAccountSave,
+  } = useGameStore({ userId: auth.user?.id ?? null })
 
   const { step: tutorialStep, completeTutorial, resetTutorial } = useTutorial(player)
 
   const [tab, setTab] = useState<TabType>('work')
 
   if (!player) {
-    return <StartScreen onStart={(name) => { resetTutorial(); startGame(name) }} />
+    return (
+      <StartScreen
+        onStart={(name) => { resetTutorial(); startGame(name) }}
+        authPanel={
+          <AuthPanel
+            disabled={auth.loading}
+            error={auth.authError}
+            isConfigured={auth.isConfigured}
+            onSignIn={auth.signIn}
+            onSignUp={auth.signUp}
+          />
+        }
+      />
+    )
   }
 
   if (isGameOver) {
@@ -122,6 +143,15 @@ export default function App() {
 
       {/* 상단 상태바 */}
       <StatusBar player={player} />
+
+      <AccountPanel
+        user={auth.user}
+        conflict={saveConflict}
+        cloudStatus={cloudStatus}
+        onUseGuestSave={useGuestSaveForAccount}
+        onUseCloudSave={useAccountSave}
+        onSignOut={() => { void auth.signOut() }}
+      />
 
       {/* 캐릭터 표시 영역 */}
       <CharacterDisplay player={player} />

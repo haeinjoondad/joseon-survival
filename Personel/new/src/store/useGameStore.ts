@@ -4,6 +4,7 @@ import type { GameEvent, EventChoice } from '../types/event'
 import { WORKS } from '../data/works'
 import { RANKS, MAX_RANK_INDEX } from '../data/ranks'
 import { EVENTS, TUTORIAL_EVENT } from '../data/events'
+import { loadCloudSave, saveCloudPlayer } from '../lib/supabase'
 
 const SAVE_KEY = 'joseon_save'
 const TICK_MS = 1000
@@ -113,7 +114,11 @@ export interface EventResult {
   effects: Record<string, number>
 }
 
-export function useGameStore() {
+interface UseGameStoreOptions {
+  userId?: string | null
+}
+
+export function useGameStore({ userId = null }: UseGameStoreOptions = {}) {
   const [player, setPlayer] = useState<Player | null>(null)
   const [offlineReward, setOfflineReward] = useState<{
     merit: number
@@ -125,12 +130,41 @@ export function useGameStore() {
   const [eventResult, setEventResult] = useState<EventResult | null>(null)
   const [isGameOver, setIsGameOver] = useState(false)
   const [promotionCelebration, setPromotionCelebration] = useState<{ rankIndex: number } | null>(null)
+  const [saveConflict, setSaveConflict] = useState(false)
+  const [cloudStatus, setCloudStatus] = useState<string | null>(null)
 
   const tickRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const cloudSyncRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const userIdRef = useRef<string | null>(userId)
+  const latestPlayerRef = useRef<Player | null>(null)
+  const cloudPlayerRef = useRef<Player | null>(null)
   // 마지막으로 이벤트를 발생시킨 30분 슬롯 번호
   const lastEventSlot = useRef(Math.floor(Date.now() / HALF_HOUR_MS))
   // 최근 발생한 이벤트 id 3개 기억 (반복 방지)
   const recentEventIds = useRef<string[]>([])
+
+  useEffect(() => {
+    userIdRef.current = userId
+  }, [userId])
+
+  const persistPlayer = useCallback((next: Player) => {
+    savePlayer(next)
+    latestPlayerRef.current = next
+
+    const currentUserId = userIdRef.current
+    if (!currentUserId || cloudSyncRef.current) return
+
+    cloudSyncRef.current = setTimeout(() => {
+      const latest = latestPlayerRef.current
+      const syncUserId = userIdRef.current
+      cloudSyncRef.current = null
+      if (!latest || !syncUserId) return
+
+      saveCloudPlayer(syncUserId, latest)
+        .then(() => setCloudStatus('계정 저장 완료'))
+        .catch(() => setCloudStatus('계정 저장에 실패했습니다'))
+    }, 5000)
+  }, [])
 
   // 초기 로드
   useEffect(() => {
@@ -158,12 +192,57 @@ export function useGameStore() {
           stoppedByMental,
         })
         setPlayer(updated)
-        savePlayer(updated)
+        persistPlayer(updated)
       } else {
         setPlayer(saved)
       }
     }
-  }, [])
+  }, [persistPlayer])
+
+  useEffect(() => {
+    if (!userId) {
+      setSaveConflict(false)
+      setCloudStatus(null)
+      cloudPlayerRef.current = null
+      return
+    }
+
+    let cancelled = false
+    setCloudStatus('계정 저장본 확인 중...')
+
+    loadCloudSave(userId)
+      .then(save => {
+        if (cancelled) return
+        const local = loadPlayer()
+
+        if (!save?.player) {
+          if (local) {
+            return saveCloudPlayer(userId, local).then(() => {
+              if (!cancelled) setCloudStatus('현재 진행도를 계정에 저장했습니다')
+            })
+          }
+          setCloudStatus(null)
+          return
+        }
+
+        cloudPlayerRef.current = save.player
+
+        if (local && JSON.stringify(local) !== JSON.stringify(save.player)) {
+          setSaveConflict(true)
+          setCloudStatus(null)
+          return
+        }
+
+        savePlayer(save.player)
+        setPlayer(save.player)
+        setCloudStatus('계정 저장본을 불러왔습니다')
+      })
+      .catch(() => {
+        if (!cancelled) setCloudStatus('계정 저장본을 불러오지 못했습니다')
+      })
+
+    return () => { cancelled = true }
+  }, [userId])
 
   // 자동 tick
   useEffect(() => {
@@ -174,7 +253,7 @@ export function useGameStore() {
         const tickResult = calcTick(prev, 1)
         const expResult = calcStatExp(prev, 1)
         const updated = { ...prev, ...tickResult, ...expResult }
-        savePlayer(updated)
+        persistPlayer(updated)
 
         // 멘탈 0 → 게임오버
         if (updated.mental === 0) {
@@ -235,7 +314,7 @@ export function useGameStore() {
       if (e.senseExp)   { next.statExp = { ...next.statExp, sense:    next.statExp.sense    + e.senseExp    } }
       if (e.politicsExp){ next.statExp = { ...next.statExp, politics: next.statExp.politics + e.politicsExp } }
 
-      savePlayer(next)
+      persistPlayer(next)
       return next
     })
 
@@ -247,7 +326,7 @@ export function useGameStore() {
 
   const startGame = useCallback((name: string) => {
     const p = createNewPlayer(name.trim() || '이름없는 관리')
-    savePlayer(p)
+    persistPlayer(p)
     setPlayer(p)
     // 게임 시작 직후 튜토리얼 첫 이벤트 발생
     setTimeout(() => setActiveEvent(TUTORIAL_EVENT), 800)
@@ -257,7 +336,7 @@ export function useGameStore() {
     setPlayer(prev => {
       if (!prev) return prev
       const updated = { ...prev, currentWork: work }
-      savePlayer(updated)
+      persistPlayer(updated)
       return updated
     })
   }, [])
@@ -272,7 +351,7 @@ export function useGameStore() {
         salary: prev.salary - cost,
         equipment: { ...prev.equipment, [slot]: prev.equipment[slot] + 1 },
       }
-      savePlayer(updated)
+      persistPlayer(updated)
       return updated
     })
   }, [])
@@ -287,7 +366,7 @@ export function useGameStore() {
         salary: prev.salary - cost,
         stats: { ...prev.stats, [stat]: prev.stats[stat] + 1 },
       }
-      savePlayer(updated)
+      persistPlayer(updated)
       return updated
     })
   }, [])
@@ -298,7 +377,7 @@ export function useGameStore() {
     setPlayer(prev => {
       if (!prev || prev.salary < RECOVER_COST) return prev
       const updated = { ...prev, salary: prev.salary - RECOVER_COST, mental: Math.min(100, prev.mental + amount) }
-      savePlayer(updated)
+      persistPlayer(updated)
       return updated
     })
   }, [])
@@ -307,7 +386,7 @@ export function useGameStore() {
     setPlayer(prev => {
       if (!prev || prev.salary < RECOVER_COST) return prev
       const updated = { ...prev, salary: prev.salary - RECOVER_COST, stamina: Math.min(100, prev.stamina + amount) }
-      savePlayer(updated)
+      persistPlayer(updated)
       return updated
     })
   }, [])
@@ -343,7 +422,7 @@ export function useGameStore() {
             ...prev,
             merit: Math.floor(prev.merit * 0.9),
           }
-      savePlayer(updated)
+      persistPlayer(updated)
       return updated
     })
 
@@ -351,7 +430,7 @@ export function useGameStore() {
       setPromotionCelebration({ rankIndex: player.rankIndex + 1 })
     }
     return success ? 'success' : 'fail'
-  }, [player])
+  }, [persistPlayer, player])
 
   const dismissOfflineReward = useCallback(() => setOfflineReward(null), [])
 
@@ -364,6 +443,30 @@ export function useGameStore() {
     setIsGameOver(false)
   }, [])
 
+  const useGuestSaveForAccount = useCallback(() => {
+    const currentUserId = userIdRef.current
+    const currentPlayer = latestPlayerRef.current ?? player ?? loadPlayer()
+    if (!currentUserId || !currentPlayer) return
+
+    saveCloudPlayer(currentUserId, currentPlayer)
+      .then(() => {
+        setSaveConflict(false)
+        setCloudStatus('현재 진행도를 계정에 저장했습니다')
+      })
+      .catch(() => setCloudStatus('계정 저장에 실패했습니다'))
+  }, [player])
+
+  const useAccountSave = useCallback(() => {
+    const accountPlayer = cloudPlayerRef.current
+    if (!accountPlayer) return
+
+    savePlayer(accountPlayer)
+    latestPlayerRef.current = accountPlayer
+    setPlayer(accountPlayer)
+    setSaveConflict(false)
+    setCloudStatus('계정 저장본을 불러왔습니다')
+  }, [])
+
   return {
     player,
     offlineReward,
@@ -371,6 +474,10 @@ export function useGameStore() {
     eventResult,
     isGameOver,
     promotionCelebration,
+    saveConflict,
+    cloudStatus,
+    useGuestSaveForAccount,
+    useAccountSave,
     dismissPromotion: () => setPromotionCelebration(null),
     startGame,
     setWork,
