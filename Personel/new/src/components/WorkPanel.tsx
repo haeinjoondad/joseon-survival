@@ -1,6 +1,9 @@
 import type { Player, WorkType } from '../types/game'
 import { WORKS } from '../data/works'
 
+const COMPLAINT_REPUTATION_PER_HOUR = 3
+const ROBE_COMPLAINT_REPUTATION_BONUS_PER_LEVEL = 0.02
+
 interface Props {
   player: Player
   onSetWork: (work: WorkType) => void
@@ -17,6 +20,9 @@ export function WorkPanel({ player, onSetWork, onRecover, onRecoverStamina }: Pr
         const isActive = player.currentWork === work.id
         const statVal = player.stats[work.statScaling]
         const bonus = (1 + (statVal - 1) * 0.1).toFixed(1)
+        const robeEnhancementLevel = Math.max(0, player.equipment.robe - 1)
+        const complaintReputationPerHour = COMPLAINT_REPUTATION_PER_HOUR *
+          (1 + robeEnhancementLevel * ROBE_COMPLAINT_REPUTATION_BONUS_PER_LEVEL)
 
         return (
           <button
@@ -38,9 +44,12 @@ export function WorkPanel({ player, onSetWork, onRecover, onRecoverStamina }: Pr
               )}
             </div>
             <p className="text-stone-400 text-xs mb-2">{work.description}</p>
-            <div className="flex gap-3 text-xs">
+            <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs">
               <span className="text-amber-300">⚔ +{(work.meritPerSec * parseFloat(bonus)).toFixed(1)}/초</span>
               <span className="text-green-400">💰 +{work.salaryPerSec.toFixed(1)}/초</span>
+              {work.id === 'complaint' && (
+                <span className="text-blue-400">👥 +{complaintReputationPerHour.toFixed(2)}/시간</span>
+              )}
               <span className="text-purple-400">멘탈 -{(work.mentalCost / 60).toFixed(2)}/초</span>
             </div>
           </button>
