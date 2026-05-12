@@ -43,13 +43,15 @@ function savePlayer(player: Player) {
 function calcTick(player: Player, seconds: number): Partial<Player> {
   const work = WORKS.find(w => w.id === player.currentWork)!
   const statBonus = 1 + (player.stats[work.statScaling] - 1) * 0.1
-  const equipBonus = 1 + (player.equipment.brush - 1) * 0.05
+  const brushBonus = 1 + (player.equipment.brush - 1) * 0.05
+  const deskBonus = 1 + (player.equipment.desk - 1) * 0.03
+  const robeBonus = 1 + (player.equipment.robe - 1) * 0.02
 
   // 체력 패널티: 30 미만이면 -20%, 0이면 -50%
   const staminaPenalty = player.stamina === 0 ? 0.5 : player.stamina < 30 ? 0.8 : 1
 
-  const meritGain = work.meritPerSec * statBonus * equipBonus * staminaPenalty * seconds
-  const salaryGain = work.salaryPerSec * seconds
+  const meritGain = work.meritPerSec * statBonus * brushBonus * deskBonus * staminaPenalty * seconds
+  const salaryGain = work.salaryPerSec * deskBonus * seconds
   const mentalLoss = work.mentalCost / 60 * seconds
   const staminaLoss = work.staminaCost / 60 * seconds
 
@@ -58,6 +60,7 @@ function calcTick(player: Player, seconds: number): Partial<Player> {
     salary: player.salary + salaryGain,
     mental: Math.max(0, player.mental - mentalLoss),
     stamina: Math.max(0, player.stamina - staminaLoss),
+    reputation: Math.min(100, player.reputation + (robeBonus - 1) * 0.01 * seconds),
   }
 }
 

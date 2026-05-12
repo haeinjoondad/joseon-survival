@@ -16,7 +16,7 @@ export interface Equipment {
 
 export interface Player {
   name: string
-  rankIndex: number       // 0~9 품계 인덱스
+  rankIndex: number       // 0~14 품계 인덱스
   merit: number           // 공적
   salary: number          // 녹봉
   mental: number          // 멘탈 (0~100)

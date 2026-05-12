@@ -13,9 +13,23 @@ const STAT_INFO = {
 }
 
 const EQUIP_INFO = {
-  brush: { label: '붓',   emoji: '🖊️', desc: '공적 획득 +5%/레벨' },
-  desk:  { label: '책상', emoji: '🪑', desc: '업무 효율 증가' },
-  robe:  { label: '관복', emoji: '👘', desc: '평판 보정' },
+  brush: { label: '붓',   emoji: '🖊️', desc: '강화 1회당 공적 획득 +5%' },
+  desk:  { label: '책상', emoji: '🪑', desc: '강화 1회당 공적·녹봉 획득 +3%' },
+  robe:  { label: '관복', emoji: '👘', desc: '강화 1회당 평판 자동 상승 +0.72/시간' },
+}
+
+function getEquipEffect(slot: keyof Player['equipment'], level: number) {
+  const upgrades = Math.max(0, level - 1)
+
+  if (slot === 'brush') {
+    return `현재 공적 +${upgrades * 5}%`
+  }
+
+  if (slot === 'desk') {
+    return `현재 공적·녹봉 +${upgrades * 3}%`
+  }
+
+  return `현재 평판 +${(upgrades * 0.72).toFixed(2)}/시간`
 }
 
 export function StatsPanel({ player, onUpgradeStat, onUpgradeEquip }: Props) {
@@ -88,6 +102,9 @@ export function StatsPanel({ player, onUpgradeStat, onUpgradeEquip }: Props) {
                       {info.label} <span className="text-green-400">+{player.equipment[key]}</span>
                     </div>
                     <div className="text-stone-500 text-xs">{info.desc}</div>
+                    <div className="text-green-400/80 text-xs mt-0.5">
+                      {getEquipEffect(key, player.equipment[key])}
+                    </div>
                   </div>
                 </div>
                 <button

@@ -24,7 +24,7 @@ const ENDINGS = [
 
 export function GameOverScreen({ name, rankIndex, totalMerit, totalSalary, onRestart }: Props) {
   const rank = RANKS[rankIndex]
-  const ending = [...ENDINGS].reverse().find(e => rankIndex <= e.maxRank) ?? ENDINGS[ENDINGS.length - 1]
+  const ending = ENDINGS.find(e => rankIndex <= e.maxRank) ?? ENDINGS[ENDINGS.length - 1]
 
   return (
     <div className="min-h-screen bg-stone-950 flex flex-col items-center justify-center p-6">
