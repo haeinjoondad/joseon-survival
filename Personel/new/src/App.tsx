@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useGameStore } from './store/useGameStore'
+import { useTutorial } from './store/useTutorial'
 import { StartScreen } from './components/StartScreen'
 import { StatusBar } from './components/StatusBar'
 import { WorkPanel } from './components/WorkPanel'
@@ -9,6 +10,7 @@ import { OfflineRewardModal } from './components/OfflineRewardModal'
 import { EventModal, EventResultModal } from './components/EventModal'
 import { CharacterDisplay } from './components/CharacterDisplay'
 import { GameOverScreen } from './components/GameOverScreen'
+import { TutorialBanner } from './components/TutorialBanner'
 import type { TabType } from './types/game'
 
 const TABS: { id: TabType; label: string; emoji: string }[] = [
@@ -16,6 +18,14 @@ const TABS: { id: TabType; label: string; emoji: string }[] = [
   { id: 'stats',     label: '성장',  emoji: '⬆️' },
   { id: 'promotion', label: '승진',  emoji: '🏆' },
 ]
+
+// 튜토리얼 단계에서 하이라이트할 탭
+const TUTORIAL_TAB_HIGHLIGHT: Record<string, TabType> = {
+  work:       'work',
+  accumulate: 'work',
+  stats:      'stats',
+  promotion:  'promotion',
+}
 
 export default function App() {
   const {
@@ -37,10 +47,12 @@ export default function App() {
     resetGame,
   } = useGameStore()
 
+  const { step: tutorialStep, completeTutorial, resetTutorial } = useTutorial(player)
+
   const [tab, setTab] = useState<TabType>('work')
 
   if (!player) {
-    return <StartScreen onStart={startGame} />
+    return <StartScreen onStart={(name) => { resetTutorial(); startGame(name) }} />
   }
 
   if (isGameOver) {
@@ -53,6 +65,18 @@ export default function App() {
         onRestart={resetGame}
       />
     )
+  }
+
+  const highlightTab = tutorialStep !== 'done'
+    ? TUTORIAL_TAB_HIGHLIGHT[tutorialStep]
+    : null
+
+  // 튜토리얼 승진 탭 방문 시 완료
+  function handleTabChange(t: TabType) {
+    setTab(t)
+    if (tutorialStep === 'promotion' && t === 'promotion') {
+      completeTutorial()
+    }
   }
 
   return (
@@ -89,6 +113,13 @@ export default function App() {
       {/* 캐릭터 표시 영역 */}
       <CharacterDisplay player={player} />
 
+      {/* 튜토리얼 배너 */}
+      <TutorialBanner
+        step={tutorialStep}
+        currentTab={tab}
+        onSkip={completeTutorial}
+      />
+
       {/* 탭 콘텐츠 */}
       <div className="flex-1 flex flex-col overflow-hidden">
         {tab === 'work' && (
@@ -116,20 +147,30 @@ export default function App() {
 
       {/* 하단 탭바 */}
       <nav className="bg-stone-900 border-t border-stone-700 flex">
-        {TABS.map(t => (
-          <button
-            key={t.id}
-            onClick={() => setTab(t.id)}
-            className={`flex-1 py-3 flex flex-col items-center gap-0.5 transition-colors ${
-              tab === t.id
-                ? 'text-amber-400 bg-stone-800'
-                : 'text-stone-500 hover:text-stone-300'
-            }`}
-          >
-            <span className="text-lg">{t.emoji}</span>
-            <span className="text-xs">{t.label}</span>
-          </button>
-        ))}
+        {TABS.map(t => {
+          const isActive = tab === t.id
+          const isHighlighted = highlightTab === t.id && !isActive
+          return (
+            <button
+              key={t.id}
+              onClick={() => handleTabChange(t.id)}
+              className={`flex-1 py-3 flex flex-col items-center gap-0.5 transition-colors relative ${
+                isActive
+                  ? 'text-amber-400 bg-stone-800'
+                  : isHighlighted
+                  ? 'text-amber-300 bg-amber-950'
+                  : 'text-stone-500 hover:text-stone-300'
+              }`}
+            >
+              <span className="text-lg">{t.emoji}</span>
+              <span className="text-xs">{t.label}</span>
+              {/* 하이라이트 점 */}
+              {isHighlighted && (
+                <span className="absolute top-1.5 right-3 w-2 h-2 bg-amber-400 rounded-full animate-pulse" />
+              )}
+            </button>
+          )
+        })}
       </nav>
     </div>
   )

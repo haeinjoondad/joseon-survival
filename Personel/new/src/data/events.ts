@@ -1,5 +1,25 @@
 import type { GameEvent } from '../types/event'
 
+// 튜토리얼 전용 첫 이벤트 (조건: rankIndex 0, 한 번만 발생)
+export const TUTORIAL_EVENT: GameEvent = {
+  id: 'tutorial_first',
+  title: '상관의 첫 면담',
+  description: '임용 첫날, 상관이 조용히 부른다.\n"자네, 이 자리가 어떤 자리인지 아는가?\n살아남는 게 반이야. 나머지 반은... 버티는 거고."',
+  emoji: '🎴',
+  choices: [
+    {
+      text: '"명심하겠습니다."',
+      effect: { mental: 10, reputation: 5, senseExp: 10 },
+      resultMsg: '상관이 고개를 끄덕였다. 오늘부터 조선 관료 생활이 시작됐다.',
+    },
+    {
+      text: '"열심히 하면 되지 않겠습니까?"',
+      effect: { merit: 15, mental: -5 },
+      resultMsg: '상관이 쓴웃음을 지었다. "그 패기가 언제까지 갈지..."',
+    },
+  ],
+}
+
 export const EVENTS: GameEvent[] = [
   // 1
   {

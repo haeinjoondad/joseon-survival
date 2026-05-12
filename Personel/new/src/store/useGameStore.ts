@@ -3,7 +3,7 @@ import type { Player, WorkType } from '../types/game'
 import type { GameEvent, EventChoice } from '../types/event'
 import { WORKS } from '../data/works'
 import { RANKS, MAX_RANK_INDEX } from '../data/ranks'
-import { EVENTS } from '../data/events'
+import { EVENTS, TUTORIAL_EVENT } from '../data/events'
 
 const SAVE_KEY = 'joseon_save'
 const TICK_MS = 1000
@@ -215,6 +215,8 @@ export function useGameStore() {
     const p = createNewPlayer(name.trim() || '이름없는 관리')
     savePlayer(p)
     setPlayer(p)
+    // 게임 시작 직후 튜토리얼 첫 이벤트 발생
+    setTimeout(() => setActiveEvent(TUTORIAL_EVENT), 800)
   }, [])
 
   const setWork = useCallback((work: WorkType) => {
