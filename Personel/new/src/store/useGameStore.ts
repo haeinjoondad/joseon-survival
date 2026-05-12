@@ -11,6 +11,15 @@ const TICK_MS = 1000
 const MAX_OFFLINE_HOURS = 8
 const OFFLINE_MIN_MENTAL = 10
 const HALF_HOUR_MS = 30 * 60 * 1000  // 정각·30분 슬롯 단위
+const MAX_REPUTATION = 100
+const ROBE_REPUTATION_PER_LEVEL_PER_HOUR = 0.25
+const COMPLAINT_REPUTATION_PER_HOUR = 3
+const ROBE_COMPLAINT_REPUTATION_BONUS_PER_LEVEL = 0.02
+const PROMOTION_REPUTATION_COST_RATE = 0.5
+const DEFAULT_PROMOTION_REPUTATION_COST_BASE = 30
+
+const clampReputation = (value: number) =>
+  Math.min(MAX_REPUTATION, Math.max(0, value))
 
 function createNewPlayer(name: string): Player {
   return {
@@ -47,7 +56,7 @@ function calcTick(player: Player, seconds: number): Partial<Player> {
   const statBonus = 1 + (player.stats[work.statScaling] - 1) * 0.1
   const brushBonus = 1 + (player.equipment.brush - 1) * 0.05
   const deskBonus = 1 + (player.equipment.desk - 1) * 0.03
-  const robeBonus = 1 + (player.equipment.robe - 1) * 0.02
+  const robeEnhancementLevel = Math.max(0, player.equipment.robe - 1)
 
   // 체력 패널티: 30 미만이면 -20%, 0이면 -50%
   const staminaPenalty = player.stamina === 0 ? 0.5 : player.stamina < 30 ? 0.8 : 1
@@ -56,13 +65,18 @@ function calcTick(player: Player, seconds: number): Partial<Player> {
   const salaryGain = work.salaryPerSec * deskBonus * seconds
   const mentalLoss = work.mentalCost / 60 * seconds
   const staminaLoss = work.staminaCost / 60 * seconds
+  const robePassiveRepGainPerHour = robeEnhancementLevel * ROBE_REPUTATION_PER_LEVEL_PER_HOUR
+  const robePassiveRepGain = robePassiveRepGainPerHour * (seconds / 3600)
+  const complaintRepGain = work.id === 'complaint'
+    ? (COMPLAINT_REPUTATION_PER_HOUR / 3600) * seconds * (1 + robeEnhancementLevel * ROBE_COMPLAINT_REPUTATION_BONUS_PER_LEVEL)
+    : 0
 
   return {
     merit: Math.min(999999, player.merit + meritGain),
     salary: player.salary + salaryGain,
     mental: Math.max(0, player.mental - mentalLoss),
     stamina: Math.max(0, player.stamina - staminaLoss),
-    reputation: Math.min(100, player.reputation + (robeBonus - 1) * 0.01 * seconds),
+    reputation: clampReputation(player.reputation + robePassiveRepGain + complaintRepGain),
   }
 }
 
@@ -309,7 +323,7 @@ export function useGameStore({ userId = null }: UseGameStoreOptions = {}) {
       if (e.salary)     { next.salary     = Math.max(0, prev.salary     + e.salary);     effects['녹봉']  = e.salary }
       if (e.mental)     { next.mental     = Math.min(100, Math.max(0, prev.mental     + e.mental));     effects['멘탈']  = e.mental }
       if (e.stamina)    { next.stamina    = Math.min(100, Math.max(0, prev.stamina    + e.stamina));    effects['체력']  = e.stamina }
-      if (e.reputation) { next.reputation = Math.min(100, Math.max(0, prev.reputation + e.reputation)); effects['평판']  = e.reputation }
+      if (e.reputation) { next.reputation = clampReputation(prev.reputation + e.reputation); effects['평판']  = e.reputation }
       if (e.writingExp) { next.statExp = { ...next.statExp, writing:  next.statExp.writing  + e.writingExp  } }
       if (e.senseExp)   { next.statExp = { ...next.statExp, sense:    next.statExp.sense    + e.senseExp    } }
       if (e.politicsExp){ next.statExp = { ...next.statExp, politics: next.statExp.politics + e.politicsExp } }
@@ -408,6 +422,8 @@ export function useGameStore({ userId = null }: UseGameStoreOptions = {}) {
     const successRate = basePct + meritBonus + repBonus + politicsBonus
 
     const success = Math.random() * 100 < successRate
+    const requiredReputationForCost = nextRank?.reputationRequired ?? DEFAULT_PROMOTION_REPUTATION_COST_BASE
+    const repCost = Math.floor(requiredReputationForCost * PROMOTION_REPUTATION_COST_RATE)
 
     setPlayer(prev => {
       if (!prev) return prev
@@ -416,7 +432,7 @@ export function useGameStore({ userId = null }: UseGameStoreOptions = {}) {
             ...prev,
             rankIndex: prev.rankIndex + 1,
             merit: 0,
-            reputation: Math.min(100, prev.reputation + 10),
+            reputation: clampReputation(prev.reputation - repCost),
           }
         : {
             ...prev,

@@ -15,7 +15,7 @@ const STAT_INFO = {
 const EQUIP_INFO = {
   brush: { label: '붓',   emoji: '🖊️', desc: '강화 1회당 공적 획득 +5%' },
   desk:  { label: '책상', emoji: '🪑', desc: '강화 1회당 공적·녹봉 획득 +3%' },
-  robe:  { label: '관복', emoji: '👘', desc: '강화 1회당 평판 자동 상승 +0.72/시간' },
+  robe:  { label: '관복', emoji: '👘', desc: '강화 1회당 평판 +0.25/시간 (항상) · 민원 처리 중 평판 획득 +2%' },
 }
 
 function getEquipEffect(slot: keyof Player['equipment'], level: number) {
@@ -29,7 +29,7 @@ function getEquipEffect(slot: keyof Player['equipment'], level: number) {
     return `현재 공적·녹봉 +${upgrades * 3}%`
   }
 
-  return `현재 평판 +${(upgrades * 0.72).toFixed(2)}/시간`
+  return `현재 평판 +${(upgrades * 0.25).toFixed(2)}/시간 · 민원 +${upgrades * 2}%`
 }
 
 export function StatsPanel({ player, onUpgradeStat, onUpgradeEquip }: Props) {

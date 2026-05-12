@@ -16,7 +16,7 @@ export const WORKS: WorkInfo[] = [
     id: 'complaint',
     name: '민원 처리',
     emoji: '📋',
-    description: '백성들의 민원을 처리한다. 평판이 오르지만 체력이 소모된다.',
+    description: '민원을 처리하여 시간에 따라 소량의 평판을 얻는다. 대신 체력이 소모된다.',
     meritPerSec: 1.2,
     salaryPerSec: 0.8,
     mentalCost: 1,
