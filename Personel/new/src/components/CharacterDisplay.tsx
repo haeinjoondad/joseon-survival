@@ -14,37 +14,41 @@ function getCharacterState(mental: number, stamina: number) {
   return 'normal'
 }
 
-const CHARACTER_FRAMES: Record<string, { body: string; expression: string; statusText: string; bg: string }> = {
+const CHARACTER_FRAMES: Record<string, { expression: string; statusText: string; bg: string }> = {
   normal: {
-    body: '🧑‍💼',
     expression: '😊',
     statusText: '오늘도 열심히 일하는 중',
     bg: 'from-stone-800 to-stone-900',
   },
   tired: {
-    body: '🧑‍💼',
     expression: '😔',
     statusText: '조금 피곤하지만 버티는 중...',
     bg: 'from-stone-800 to-stone-900',
   },
   exhausted: {
-    body: '🧑‍💼',
     expression: '😵',
     statusText: '한계가 가까워오고 있다',
     bg: 'from-red-950 to-stone-900',
   },
   dead: {
-    body: '🧑‍💼',
     expression: '💀',
     statusText: '영혼이 빠져나가는 느낌이다',
     bg: 'from-red-950 to-stone-950',
   },
   burnout: {
-    body: '🧑‍💼',
     expression: '😶',
     statusText: '붓을 든 채 멍하니 앉아있다',
     bg: 'from-stone-950 to-stone-950',
   },
+}
+
+function getCharacterImage(rankIndex: number) {
+  if (rankIndex >= 17) return '/characters/정1품.png'
+  if (rankIndex >= 15) return '/characters/정2품.png'
+  if (rankIndex >= 9) return '/characters/정5품.png'
+  if (rankIndex >= 7) return '/characters/정6품.png'
+  if (rankIndex >= 5) return '/characters/정7품.png'
+  return '/characters/종9품.png'
 }
 
 // 품계에 따라 관복 색상 변화
@@ -63,18 +67,23 @@ export function CharacterDisplay({ player }: Props) {
   const state = getCharacterState(player.mental, player.stamina)
   const frame = CHARACTER_FRAMES[state]
   const robeColor = getRobeColor(player.rankIndex)
+  const characterImage = getCharacterImage(player.rankIndex)
 
   return (
     <div className={`bg-gradient-to-b ${frame.bg} border-b border-stone-700 px-4 py-4 flex flex-col items-center`}>
       {/* 캐릭터 본체 */}
       <div className="relative mb-2">
-        {/* 관복 배경 원 */}
-        <div className={`w-24 h-24 rounded-full bg-stone-800 border-2 ${
+        {/* 관복 이미지 */}
+        <div className={`w-28 h-28 rounded-full bg-stone-800 border-2 overflow-hidden ${
           state === 'normal' ? 'border-amber-600' :
           state === 'tired'  ? 'border-stone-600' :
           'border-red-800'
         } flex items-center justify-center shadow-lg`}>
-          <span className="text-5xl">{frame.body}</span>
+          <img
+            src={characterImage}
+            alt={`${rank.name} 캐릭터`}
+            className="w-full h-full object-cover"
+          />
         </div>
 
         {/* 표정 뱃지 (우하단) */}
