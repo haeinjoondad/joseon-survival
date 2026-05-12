@@ -44,12 +44,18 @@ export function WorkPanel({ player, onSetWork, onRecover, onRecoverStamina }: Pr
               )}
             </div>
             <p className="text-stone-400 text-xs mb-2">{work.description}</p>
+            {work.id === 'complaint' && (
+              <div className="mb-2 inline-flex items-center gap-1.5 rounded border border-blue-800 bg-blue-950/60 px-2 py-1 text-xs text-blue-300">
+                <span>👥</span>
+                <span>평판 +{complaintReputationPerHour.toFixed(2)}/시간</span>
+                {robeEnhancementLevel > 0 && (
+                  <span className="text-blue-400/80">(관복 +{robeEnhancementLevel * 2}%)</span>
+                )}
+              </div>
+            )}
             <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs">
               <span className="text-amber-300">⚔ +{(work.meritPerSec * parseFloat(bonus)).toFixed(1)}/초</span>
               <span className="text-green-400">💰 +{work.salaryPerSec.toFixed(1)}/초</span>
-              {work.id === 'complaint' && (
-                <span className="text-blue-400">👥 +{complaintReputationPerHour.toFixed(2)}/시간</span>
-              )}
               <span className="text-purple-400">멘탈 -{(work.mentalCost / 60).toFixed(2)}/초</span>
             </div>
           </button>
