@@ -1,0 +1,22 @@
+@import url('https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@400;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+* {
+  -webkit-tap-highlight-color: transparent;
+  box-sizing: border-box;
+}
+
+body {
+  background-color: #1a1008;
+  color: #f5e6c8;
+  font-family: 'Noto Serif KR', serif;
+  overflow-x: hidden;
+}
+
+/* 스크롤바 숨기기 (모바일 느낌) */
+::-webkit-scrollbar {
+  display: none;
+}

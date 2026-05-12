@@ -1,0 +1,346 @@
+import { useState, useEffect, useCallback, useRef } from 'react'
+import type { Player, WorkType } from '../types/game'
+import type { GameEvent, EventChoice } from '../types/event'
+import { WORKS } from '../data/works'
+import { RANKS, MAX_RANK_INDEX } from '../data/ranks'
+import { EVENTS } from '../data/events'
+
+const SAVE_KEY = 'joseon_save'
+const TICK_MS = 1000
+const MAX_OFFLINE_HOURS = 8
+const HALF_HOUR_MS = 30 * 60 * 1000  // 정각·30분 슬롯 단위
+
+function createNewPlayer(name: string): Player {
+  return {
+    name,
+    rankIndex: 0,
+    merit: 0,
+    salary: 0,
+    mental: 100,
+    stamina: 100,
+    reputation: 10,
+    stats: { writing: 1, sense: 1, politics: 1 },
+    equipment: { brush: 1, desk: 1, robe: 1 },
+    statExp: { writing: 0, sense: 0, politics: 0 },
+    currentWork: 'petition',
+    lastSaveTime: Date.now(),
+  }
+}
+
+function loadPlayer(): Player | null {
+  try {
+    const raw = localStorage.getItem(SAVE_KEY)
+    return raw ? (JSON.parse(raw) as Player) : null
+  } catch {
+    return null
+  }
+}
+
+function savePlayer(player: Player) {
+  localStorage.setItem(SAVE_KEY, JSON.stringify({ ...player, lastSaveTime: Date.now() }))
+}
+
+function calcTick(player: Player, seconds: number): Partial<Player> {
+  const work = WORKS.find(w => w.id === player.currentWork)!
+  const statBonus = 1 + (player.stats[work.statScaling] - 1) * 0.1
+  const equipBonus = 1 + (player.equipment.brush - 1) * 0.05
+
+  // 체력 패널티: 30 미만이면 -20%, 0이면 -50%
+  const staminaPenalty = player.stamina === 0 ? 0.5 : player.stamina < 30 ? 0.8 : 1
+
+  const meritGain = work.meritPerSec * statBonus * equipBonus * staminaPenalty * seconds
+  const salaryGain = work.salaryPerSec * seconds
+  const mentalLoss = work.mentalCost / 60 * seconds
+  const staminaLoss = work.staminaCost / 60 * seconds
+
+  return {
+    merit: Math.min(999999, player.merit + meritGain),
+    salary: player.salary + salaryGain,
+    mental: Math.max(0, player.mental - mentalLoss),
+    stamina: Math.max(0, player.stamina - staminaLoss),
+  }
+}
+
+function calcStatExp(player: Player, seconds: number): Partial<Player> {
+  const work = WORKS.find(w => w.id === player.currentWork)!
+  const key = work.statScaling
+  const expGain = 0.1 * seconds
+  const newExp = { ...player.statExp, [key]: player.statExp[key] + expGain }
+  const newStats = { ...player.stats }
+
+  if (newExp[key] >= 100 && newStats[key] < 50) {
+    newExp[key] -= 100
+    newStats[key] += 1
+  }
+
+  return { statExp: newExp, stats: newStats }
+}
+
+function pickEvent(player: Player, recentIds: string[]): GameEvent | null {
+  const eligible = EVENTS.filter(ev => {
+    if (recentIds.includes(ev.id)) return false
+    const c = ev.condition
+    if (!c) return true
+    if (c.minRank !== undefined && player.rankIndex < c.minRank) return false
+    if (c.maxRank !== undefined && player.rankIndex > c.maxRank) return false
+    if (c.minMental !== undefined && player.mental < c.minMental) return false
+    if (c.maxMental !== undefined && player.mental > c.maxMental) return false
+    return true
+  })
+  if (eligible.length === 0) return null
+  return eligible[Math.floor(Math.random() * eligible.length)]
+}
+
+export interface EventResult {
+  choiceText: string
+  success?: boolean
+  message: string
+  effects: Record<string, number>
+}
+
+export function useGameStore() {
+  const [player, setPlayer] = useState<Player | null>(null)
+  const [offlineReward, setOfflineReward] = useState<{ merit: number; salary: number } | null>(null)
+  const [activeEvent, setActiveEvent] = useState<GameEvent | null>(null)
+  const [eventResult, setEventResult] = useState<EventResult | null>(null)
+  const [isGameOver, setIsGameOver] = useState(false)
+
+  const tickRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  // 마지막으로 이벤트를 발생시킨 30분 슬롯 번호
+  const lastEventSlot = useRef(Math.floor(Date.now() / HALF_HOUR_MS))
+  // 최근 발생한 이벤트 id 3개 기억 (반복 방지)
+  const recentEventIds = useRef<string[]>([])
+
+  // 초기 로드
+  useEffect(() => {
+    const saved = loadPlayer()
+    if (saved) {
+      const elapsed = Math.min(
+        (Date.now() - saved.lastSaveTime) / 1000,
+        MAX_OFFLINE_HOURS * 3600
+      )
+      if (elapsed > 30) {
+        const reward = calcTick(saved, elapsed)
+        const rewardMerit = (reward.merit ?? saved.merit) - saved.merit
+        const rewardSalary = (reward.salary ?? saved.salary) - saved.salary
+        setOfflineReward({ merit: Math.floor(rewardMerit), salary: Math.floor(rewardSalary) })
+        setPlayer({ ...saved, ...reward })
+      } else {
+        setPlayer(saved)
+      }
+    }
+  }, [])
+
+  // 자동 tick
+  useEffect(() => {
+    if (!player) return
+    tickRef.current = setInterval(() => {
+      setPlayer(prev => {
+        if (!prev) return prev
+        const tickResult = calcTick(prev, 1)
+        const expResult = calcStatExp(prev, 1)
+        const updated = { ...prev, ...tickResult, ...expResult }
+        savePlayer(updated)
+
+        // 멘탈 0 → 게임오버
+        if (updated.mental === 0) {
+          setIsGameOver(true)
+        }
+
+        // 정각·30분 슬롯이 바뀌면 이벤트 발생 시도
+        const currentSlot = Math.floor(Date.now() / HALF_HOUR_MS)
+        if (currentSlot !== lastEventSlot.current) {
+          lastEventSlot.current = currentSlot
+          setActiveEvent(current => {
+            if (current) return current  // 이미 이벤트 중이면 유지
+            const ev = pickEvent(updated, recentEventIds.current)
+            if (ev) {
+              recentEventIds.current = [ev.id, ...recentEventIds.current].slice(0, 3)
+            }
+            return ev
+          })
+        }
+
+        return updated
+      })
+    }, TICK_MS)
+    return () => { if (tickRef.current) clearInterval(tickRef.current) }
+  }, [player?.currentWork, player === null])
+
+  const resolveChoice = useCallback((choice: EventChoice) => {
+    if (!player) return
+
+    let success: boolean | undefined
+    let message: string
+    let appliedEffect = choice.effect
+
+    if (choice.check) {
+      const statVal = player.stats[choice.check.stat]
+      success = statVal >= choice.check.threshold
+      message = success
+        ? (choice.successMsg ?? '성공했다.')
+        : (choice.failMsg ?? '실패했다.')
+      if (!success) appliedEffect = choice.failEffect
+    } else {
+      message = choice.resultMsg ?? ''
+    }
+
+    const effects: Record<string, number> = {}
+
+    setPlayer(prev => {
+      if (!prev || !appliedEffect) return prev
+      const e = appliedEffect
+      const next = { ...prev }
+
+      if (e.merit)      { next.merit      = Math.max(0, prev.merit      + e.merit);      effects['공적']  = e.merit }
+      if (e.salary)     { next.salary     = Math.max(0, prev.salary     + e.salary);     effects['녹봉']  = e.salary }
+      if (e.mental)     { next.mental     = Math.min(100, Math.max(0, prev.mental     + e.mental));     effects['멘탈']  = e.mental }
+      if (e.stamina)    { next.stamina    = Math.min(100, Math.max(0, prev.stamina    + e.stamina));    effects['체력']  = e.stamina }
+      if (e.reputation) { next.reputation = Math.min(100, Math.max(0, prev.reputation + e.reputation)); effects['평판']  = e.reputation }
+      if (e.writingExp) { next.statExp = { ...next.statExp, writing:  next.statExp.writing  + e.writingExp  } }
+      if (e.senseExp)   { next.statExp = { ...next.statExp, sense:    next.statExp.sense    + e.senseExp    } }
+      if (e.politicsExp){ next.statExp = { ...next.statExp, politics: next.statExp.politics + e.politicsExp } }
+
+      savePlayer(next)
+      return next
+    })
+
+    setEventResult({ choiceText: choice.text, success, message, effects })
+    setActiveEvent(null)
+  }, [player])
+
+  const dismissEventResult = useCallback(() => setEventResult(null), [])
+
+  const startGame = useCallback((name: string) => {
+    const p = createNewPlayer(name.trim() || '이름없는 관리')
+    savePlayer(p)
+    setPlayer(p)
+  }, [])
+
+  const setWork = useCallback((work: WorkType) => {
+    setPlayer(prev => {
+      if (!prev) return prev
+      const updated = { ...prev, currentWork: work }
+      savePlayer(updated)
+      return updated
+    })
+  }, [])
+
+  const upgradeEquipment = useCallback((slot: keyof Player['equipment']) => {
+    setPlayer(prev => {
+      if (!prev) return prev
+      const cost = prev.equipment[slot] * 50
+      if (prev.salary < cost) return prev
+      const updated = {
+        ...prev,
+        salary: prev.salary - cost,
+        equipment: { ...prev.equipment, [slot]: prev.equipment[slot] + 1 },
+      }
+      savePlayer(updated)
+      return updated
+    })
+  }, [])
+
+  const upgradeStat = useCallback((stat: keyof Player['stats']) => {
+    setPlayer(prev => {
+      if (!prev) return prev
+      const cost = prev.stats[stat] * 30
+      if (prev.salary < cost) return prev
+      const updated = {
+        ...prev,
+        salary: prev.salary - cost,
+        stats: { ...prev.stats, [stat]: prev.stats[stat] + 1 },
+      }
+      savePlayer(updated)
+      return updated
+    })
+  }, [])
+
+  const RECOVER_COST = 50
+
+  const recoverMental = useCallback((amount: number) => {
+    setPlayer(prev => {
+      if (!prev || prev.salary < RECOVER_COST) return prev
+      const updated = { ...prev, salary: prev.salary - RECOVER_COST, mental: Math.min(100, prev.mental + amount) }
+      savePlayer(updated)
+      return updated
+    })
+  }, [])
+
+  const recoverStamina = useCallback((amount: number) => {
+    setPlayer(prev => {
+      if (!prev || prev.salary < RECOVER_COST) return prev
+      const updated = { ...prev, salary: prev.salary - RECOVER_COST, stamina: Math.min(100, prev.stamina + amount) }
+      savePlayer(updated)
+      return updated
+    })
+  }, [])
+
+  const attemptPromotion = useCallback((): 'success' | 'fail' | 'max' | 'not_ready' => {
+    if (!player) return 'not_ready'
+    if (player.rankIndex >= MAX_RANK_INDEX) return 'max'
+
+    const nextRank = RANKS[player.rankIndex + 1]
+    if (
+      player.merit < nextRank.meritRequired ||
+      player.reputation < nextRank.reputationRequired
+    ) return 'not_ready'
+
+    const basePct = 40
+    const meritBonus = Math.min(30, (player.merit - nextRank.meritRequired) / nextRank.meritRequired * 20)
+    const repBonus = Math.min(20, (player.reputation - nextRank.reputationRequired) * 0.5)
+    const politicsBonus = Math.min(10, (player.stats.politics - 1) * 2)
+    const successRate = basePct + meritBonus + repBonus + politicsBonus
+
+    const success = Math.random() * 100 < successRate
+
+    setPlayer(prev => {
+      if (!prev) return prev
+      const updated = success
+        ? {
+            ...prev,
+            rankIndex: prev.rankIndex + 1,
+            merit: 0,
+            reputation: Math.min(100, prev.reputation + 10),
+          }
+        : {
+            ...prev,
+            merit: Math.floor(prev.merit * 0.9),
+          }
+      savePlayer(updated)
+      return updated
+    })
+
+    return success ? 'success' : 'fail'
+  }, [player])
+
+  const dismissOfflineReward = useCallback(() => setOfflineReward(null), [])
+
+  const resetGame = useCallback(() => {
+    localStorage.removeItem(SAVE_KEY)
+    setPlayer(null)
+    setOfflineReward(null)
+    setActiveEvent(null)
+    setEventResult(null)
+    setIsGameOver(false)
+  }, [])
+
+  return {
+    player,
+    offlineReward,
+    activeEvent,
+    eventResult,
+    isGameOver,
+    startGame,
+    setWork,
+    upgradeEquipment,
+    upgradeStat,
+    recoverMental,
+    resolveChoice,
+    dismissEventResult,
+    attemptPromotion,
+    dismissOfflineReward,
+    recoverStamina,
+    resetGame,
+  }
+}
