@@ -8,6 +8,7 @@ import { EVENTS, TUTORIAL_EVENT } from '../data/events'
 const SAVE_KEY = 'joseon_save'
 const TICK_MS = 1000
 const MAX_OFFLINE_HOURS = 8
+const OFFLINE_MIN_MENTAL = 10
 const HALF_HOUR_MS = 30 * 60 * 1000  // 정각·30분 슬롯 단위
 
 function createNewPlayer(name: string): Player {
@@ -64,6 +65,17 @@ function calcTick(player: Player, seconds: number): Partial<Player> {
   }
 }
 
+function calcOfflineWorkSeconds(player: Player, elapsedSeconds: number) {
+  const work = WORKS.find(w => w.id === player.currentWork)!
+  const mentalLossPerSecond = work.mentalCost / 60
+
+  if (player.mental <= OFFLINE_MIN_MENTAL) return 0
+  if (mentalLossPerSecond <= 0) return elapsedSeconds
+
+  const secondsUntilRest = (player.mental - OFFLINE_MIN_MENTAL) / mentalLossPerSecond
+  return Math.min(elapsedSeconds, Math.max(0, secondsUntilRest))
+}
+
 function calcStatExp(player: Player, seconds: number): Partial<Player> {
   const work = WORKS.find(w => w.id === player.currentWork)!
   const key = work.statScaling
@@ -103,7 +115,12 @@ export interface EventResult {
 
 export function useGameStore() {
   const [player, setPlayer] = useState<Player | null>(null)
-  const [offlineReward, setOfflineReward] = useState<{ merit: number; salary: number } | null>(null)
+  const [offlineReward, setOfflineReward] = useState<{
+    merit: number
+    salary: number
+    workedSeconds: number
+    stoppedByMental: boolean
+  } | null>(null)
   const [activeEvent, setActiveEvent] = useState<GameEvent | null>(null)
   const [eventResult, setEventResult] = useState<EventResult | null>(null)
   const [isGameOver, setIsGameOver] = useState(false)
@@ -124,11 +141,24 @@ export function useGameStore() {
         MAX_OFFLINE_HOURS * 3600
       )
       if (elapsed > 30) {
-        const reward = calcTick(saved, elapsed)
+        const workedSeconds = calcOfflineWorkSeconds(saved, elapsed)
+        const stoppedByMental = workedSeconds < elapsed
+        const reward = calcTick(saved, workedSeconds)
         const rewardMerit = (reward.merit ?? saved.merit) - saved.merit
         const rewardSalary = (reward.salary ?? saved.salary) - saved.salary
-        setOfflineReward({ merit: Math.floor(rewardMerit), salary: Math.floor(rewardSalary) })
-        setPlayer({ ...saved, ...reward })
+        const updated = {
+          ...saved,
+          ...reward,
+          mental: stoppedByMental ? OFFLINE_MIN_MENTAL : (reward.mental ?? saved.mental),
+        }
+        setOfflineReward({
+          merit: Math.floor(rewardMerit),
+          salary: Math.floor(rewardSalary),
+          workedSeconds: Math.floor(workedSeconds),
+          stoppedByMental,
+        })
+        setPlayer(updated)
+        savePlayer(updated)
       } else {
         setPlayer(saved)
       }

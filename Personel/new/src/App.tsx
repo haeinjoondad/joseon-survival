@@ -89,6 +89,8 @@ export default function App() {
         <OfflineRewardModal
           merit={offlineReward.merit}
           salary={offlineReward.salary}
+          workedSeconds={offlineReward.workedSeconds}
+          stoppedByMental={offlineReward.stoppedByMental}
           onDismiss={dismissOfflineReward}
         />
       )}
