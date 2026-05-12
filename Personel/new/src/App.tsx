@@ -34,6 +34,7 @@ export default function App() {
     dismissEventResult,
     attemptPromotion,
     dismissOfflineReward,
+    resetGame,
   } = useGameStore()
 
   const [tab, setTab] = useState<TabType>('work')
