@@ -9,12 +9,17 @@ interface Props {
 }
 
 const ENDINGS = [
-  { maxRank: 0, title: '하루 만에 사직', desc: '임용된 지 하루도 안 돼 사표를 던졌다.\n종9품의 벽은 높았다.' },
-  { maxRank: 2, title: '신입의 번아웃', desc: '상소문 몇 장 쓰다 붓을 꺾었다.\n조선 관료제는 녹록지 않았다.' },
-  { maxRank: 4, title: '중도 하차', desc: '어느 정도 자리를 잡았지만\n결국 버티지 못하고 낙향했다.' },
-  { maxRank: 6, title: '뜻을 굽히지 못하고', desc: '고집대로 살다 탈진했다.\n청렴했지만 가난했다.' },
-  { maxRank: 8, title: '화려한 퇴장', desc: '꽤 높은 자리까지 올랐다.\n하지만 조선 조정은 끝내 버겁었다.' },
-  { maxRank: 9, title: '당상관의 낙향', desc: '당상관까지 올랐다.\n멘탈이 바닥나기 전에 그만두길 잘했다.' },
+  { maxRank: 0,  title: '하루 만에 사직',   desc: '임용된 지 하루도 안 돼 사표를 던졌다.\n종9품의 벽은 높았다.' },
+  { maxRank: 2,  title: '신입의 번아웃',    desc: '상소문 몇 장 쓰다 붓을 꺾었다.\n조선 관료제는 녹록지 않았다.' },
+  { maxRank: 4,  title: '중도 하차',        desc: '어느 정도 자리를 잡았지만\n결국 버티지 못하고 낙향했다.' },
+  { maxRank: 6,  title: '뜻을 굽히지 못하고', desc: '고집대로 살다 탈진했다.\n청렴했지만 가난했다.' },
+  { maxRank: 8,  title: '화려한 퇴장',      desc: '꽤 높은 자리까지 올랐다.\n하지만 조선 조정은 끝내 버겁었다.' },
+  { maxRank: 9,  title: '당상관의 낙향',    desc: '당상관까지 올랐다.\n멘탈이 바닥나기 전에 그만두길 잘했다.' },
+  { maxRank: 10, title: '판서의 한숨',      desc: '장관 자리까지 올랐으나\n권력의 무게를 이기지 못했다.' },
+  { maxRank: 11, title: '대제학의 붓',      desc: '학문으로 조정을 이끌었으나\n끝내 정치의 파도에 쓸렸다.' },
+  { maxRank: 12, title: '좌찬성의 결단',    desc: '임금의 곁에서 나라를 보필했다.\n그것만으로도 충분한 생이었다.' },
+  { maxRank: 13, title: '우의정의 여한',    desc: '정승 반열에 올랐으나\n영의정의 자리는 끝내 비어있었다.' },
+  { maxRank: 14, title: '영의정 등극',      desc: '종9품 참봉에서 영의정까지.\n조선 역사에 이름을 새겼다.' },
 ]
 
 export function GameOverScreen({ name, rankIndex, totalMerit, totalSalary, onRestart }: Props) {

@@ -49,9 +49,11 @@ const CHARACTER_FRAMES: Record<string, { body: string; expression: string; statu
 
 // 품계에 따라 관복 색상 변화
 function getRobeColor(rankIndex: number) {
-  if (rankIndex >= 8) return 'text-purple-300'   // 당상관급
-  if (rankIndex >= 6) return 'text-blue-300'     // 6품 이상
-  if (rankIndex >= 3) return 'text-green-300'    // 중간
+  if (rankIndex >= 13) return 'text-yellow-200'  // 정1품 의정
+  if (rankIndex >= 10) return 'text-amber-300'   // 종2품~종1품
+  if (rankIndex >= 8)  return 'text-purple-300'  // 당상관급
+  if (rankIndex >= 6)  return 'text-blue-300'    // 6품 이상
+  if (rankIndex >= 3)  return 'text-green-300'   // 중간
   return 'text-stone-300'                        // 하급
 }
 
