@@ -104,6 +104,7 @@ export function useGameStore() {
   const [activeEvent, setActiveEvent] = useState<GameEvent | null>(null)
   const [eventResult, setEventResult] = useState<EventResult | null>(null)
   const [isGameOver, setIsGameOver] = useState(false)
+  const [promotionCelebration, setPromotionCelebration] = useState<{ rankIndex: number } | null>(null)
 
   const tickRef = useRef<ReturnType<typeof setInterval> | null>(null)
   // 마지막으로 이벤트를 발생시킨 30분 슬롯 번호
@@ -313,6 +314,9 @@ export function useGameStore() {
       return updated
     })
 
+    if (success) {
+      setPromotionCelebration({ rankIndex: player.rankIndex + 1 })
+    }
     return success ? 'success' : 'fail'
   }, [player])
 
@@ -333,6 +337,8 @@ export function useGameStore() {
     activeEvent,
     eventResult,
     isGameOver,
+    promotionCelebration,
+    dismissPromotion: () => setPromotionCelebration(null),
     startGame,
     setWork,
     upgradeEquipment,

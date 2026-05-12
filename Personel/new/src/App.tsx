@@ -11,6 +11,7 @@ import { EventModal, EventResultModal } from './components/EventModal'
 import { CharacterDisplay } from './components/CharacterDisplay'
 import { GameOverScreen } from './components/GameOverScreen'
 import { TutorialBanner } from './components/TutorialBanner'
+import { PromotionCelebration } from './components/PromotionCelebration'
 import type { TabType } from './types/game'
 
 const TABS: { id: TabType; label: string; emoji: string }[] = [
@@ -45,6 +46,8 @@ export default function App() {
     attemptPromotion,
     dismissOfflineReward,
     resetGame,
+    promotionCelebration,
+    dismissPromotion,
   } = useGameStore()
 
   const { step: tutorialStep, completeTutorial, resetTutorial } = useTutorial(player)
@@ -96,6 +99,14 @@ export default function App() {
           event={activeEvent}
           player={player}
           onChoose={i => resolveChoice(activeEvent.choices[i])}
+        />
+      )}
+
+      {/* 승진 축하 연출 */}
+      {promotionCelebration && (
+        <PromotionCelebration
+          rankIndex={promotionCelebration.rankIndex}
+          onDismiss={dismissPromotion}
         />
       )}
 
