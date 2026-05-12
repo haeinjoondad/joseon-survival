@@ -15,7 +15,11 @@ const STAT_INFO = {
 const EQUIP_INFO = {
   brush: { label: '붓',   emoji: '🖊️', desc: '강화 1회당 공적 획득 +5%' },
   desk:  { label: '책상', emoji: '🪑', desc: '강화 1회당 공적·녹봉 획득 +3%' },
-  robe:  { label: '관복', emoji: '👘', desc: '강화 1회당 평판 +0.25/시간 (항상) · 민원 처리 중 평판 획득 +2%' },
+  robe:  {
+    label: '관복',
+    emoji: '👘',
+    desc: ['평판 +0.25/시간 (항상)', '민원 처리 평판 +2%/강화'],
+  },
 }
 
 function getEquipEffect(slot: keyof Player['equipment'], level: number) {
@@ -94,14 +98,18 @@ export function StatsPanel({ player, onUpgradeStat, onUpgradeEquip }: Props) {
             const canAfford = player.salary >= cost
 
             return (
-              <div key={key} className="bg-stone-800 rounded-lg p-3 border border-stone-700 flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <span className="text-lg">{info.emoji}</span>
-                  <div>
+              <div key={key} className="bg-stone-800 rounded-lg p-3 border border-stone-700 grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3">
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className="text-lg shrink-0">{info.emoji}</span>
+                  <div className="min-w-0">
                     <div className="text-hanji text-sm font-bold">
                       {info.label} <span className="text-green-400">+{player.equipment[key]}</span>
                     </div>
-                    <div className="text-stone-500 text-xs">{info.desc}</div>
+                    <div className="text-stone-500 text-xs leading-4">
+                      {Array.isArray(info.desc)
+                        ? info.desc.map(line => <div key={line}>{line}</div>)
+                        : info.desc}
+                    </div>
                     <div className="text-green-400/80 text-xs mt-0.5">
                       {getEquipEffect(key, player.equipment[key])}
                     </div>
@@ -110,7 +118,7 @@ export function StatsPanel({ player, onUpgradeStat, onUpgradeEquip }: Props) {
                 <button
                   onClick={() => onUpgradeEquip(key)}
                   disabled={!canAfford}
-                  className="bg-green-800 hover:bg-green-700 disabled:opacity-40 disabled:cursor-not-allowed text-hanji text-xs px-3 py-1.5 rounded transition-colors"
+                  className="w-12 bg-green-800 hover:bg-green-700 disabled:opacity-40 disabled:cursor-not-allowed text-hanji text-xs px-2 py-1.5 rounded transition-colors"
                 >
                   강화<br />{cost}냥
                 </button>
