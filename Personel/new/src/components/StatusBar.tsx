@@ -1,5 +1,6 @@
 import type { Player } from '../types/game'
 import { RANKS } from '../data/ranks'
+import { KING_MOODS } from '../data/balance'
 
 interface Props {
   player: Player
@@ -26,6 +27,7 @@ function MentalEmoji({ mental }: { mental: number }) {
 
 export function StatusBar({ player }: Props) {
   const rank = RANKS[player.rankIndex]
+  const mood = KING_MOODS[player.kingMood]
 
   return (
     <div className="bg-stone-900 border-b border-stone-700 px-4 py-3">
@@ -35,7 +37,10 @@ export function StatusBar({ player }: Props) {
           <span className="text-amber-400 text-xs font-bold">{rank.name} {rank.title}</span>
           <span className="text-stone-400 text-xs ml-2">{player.name}</span>
         </div>
-        <MentalEmoji mental={player.mental} />
+        <div className="flex items-center gap-2">
+          <span className={`text-xs ${mood.color}`}>왕심 {mood.emoji} {mood.label}</span>
+          <MentalEmoji mental={player.mental} />
+        </div>
       </div>
 
       {/* 자원 */}

@@ -1,5 +1,11 @@
 import type { Player, WorkType } from '../types/game'
 import { WORKS } from '../data/works'
+import {
+  HALF_HOUR_MS,
+  KING_MOODS,
+  LEDGER_MERIT_MULTIPLIER,
+  getLedgerInspectionChance,
+} from '../data/balance'
 
 const COMPLAINT_REPUTATION_PER_HOUR = 3
 const ROBE_COMPLAINT_REPUTATION_BONUS_PER_LEVEL = 0.02
@@ -9,17 +15,64 @@ const STAT_LABELS = {
   politics: { emoji: '🏛️', label: '정치력' },
 }
 
+function formatMinutes(ms: number) {
+  return `${Math.max(1, Math.ceil(ms / 60000))}분`
+}
+
+function getRiskLabel(chance: number) {
+  if (chance >= 0.5) return '매우 높음'
+  if (chance >= 0.3) return '높음'
+  if (chance >= 0.15) return '보통'
+  return '낮음'
+}
+
 interface Props {
   player: Player
   onSetWork: (work: WorkType) => void
+  onSetLedgerManipulation: (enabled: boolean) => void
   onRecover: () => void
   onRecoverStamina: () => void
 }
 
-export function WorkPanel({ player, onSetWork, onRecover, onRecoverStamina }: Props) {
+export function WorkPanel({ player, onSetWork, onSetLedgerManipulation, onRecover, onRecoverStamina }: Props) {
+  const mood = KING_MOODS[player.kingMood]
+  const msToNextInspection = HALF_HOUR_MS - (Date.now() % HALF_HOUR_MS)
+  const ledgerInspectionChance = player.ledgerManipulation
+    ? getLedgerInspectionChance(player.ledgerHeat, player.kingMood)
+    : 0
+
   return (
     <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
       <h2 className="text-hanji text-sm font-bold text-center mb-4">── 오늘의 업무 ──</h2>
+
+      <button
+        onClick={() => onSetLedgerManipulation(!player.ledgerManipulation)}
+        className={`w-full rounded-lg border px-3 py-2 text-left transition-colors ${
+          player.ledgerManipulation
+            ? 'bg-red-950/70 border-red-700'
+            : 'bg-stone-800 border-stone-700 hover:border-stone-500'
+        }`}
+      >
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <div className="text-hanji text-sm font-bold">📒 장부 조작</div>
+            <div className="text-stone-400 text-xs">공적 x3 · 정각/30분 감찰 위험</div>
+          </div>
+          <div className={`text-xs font-bold shrink-0 ${player.ledgerManipulation ? 'text-red-300' : 'text-stone-500'}`}>
+            {player.ledgerManipulation ? '조작 중' : '꺼짐'}
+          </div>
+        </div>
+        {player.ledgerManipulation && (
+          <div className="mt-1 space-y-0.5 text-xs text-red-300">
+            <div>
+              다음 감찰까지 {formatMinutes(msToNextInspection)} · 의심도 {Math.floor(player.ledgerHeat)} · 위험 {getRiskLabel(ledgerInspectionChance)}({Math.floor(ledgerInspectionChance * 100)}%)
+            </div>
+            <div className="text-red-200/80">
+              왕심 {mood.label}: 감찰 위험 {mood.ledgerRiskBonus >= 0 ? '+' : ''}{Math.round(mood.ledgerRiskBonus * 100)}% · 의심도 70 이상 적발 시 강등 가능
+            </div>
+          </div>
+        )}
+      </button>
 
       {WORKS.map(work => {
         const isActive = player.currentWork === work.id
@@ -28,7 +81,9 @@ export function WorkPanel({ player, onSetWork, onRecover, onRecoverStamina }: Pr
         const brushBonus = 1 + (player.equipment.brush - 1) * 0.05
         const deskBonus = 1 + (player.equipment.desk - 1) * 0.03
         const staminaPenalty = player.stamina === 0 ? 0.5 : player.stamina < 30 ? 0.8 : 1
-        const meritPerSecond = work.meritPerSec * statBonus * brushBonus * deskBonus * staminaPenalty
+        const moodMeritBonus = work.id === 'petition' ? mood.meritMultiplier : 1
+        const ledgerBonus = player.ledgerManipulation ? LEDGER_MERIT_MULTIPLIER : 1
+        const meritPerSecond = work.meritPerSec * statBonus * brushBonus * deskBonus * staminaPenalty * moodMeritBonus * ledgerBonus
         const salaryPerSecond = work.salaryPerSec * deskBonus
         const robeEnhancementLevel = Math.max(0, player.equipment.robe - 1)
         const complaintReputationPerHour = COMPLAINT_REPUTATION_PER_HOUR *
@@ -61,7 +116,7 @@ export function WorkPanel({ player, onSetWork, onRecover, onRecoverStamina }: Pr
               {work.id === 'complaint' && (
                 <span className="text-blue-400">👥 +{complaintReputationPerHour.toFixed(2)}/시간</span>
               )}
-              <span className="text-purple-400">🧠 -{work.mentalCost.toFixed(1)}/분</span>
+              <span className="text-purple-400">🧠 -{(work.mentalCost * mood.mentalCostMultiplier).toFixed(1)}/분</span>
               <span className="text-red-400">❤️ -{work.staminaCost.toFixed(1)}/분</span>
               <span className="text-stone-300">{growthStat.emoji} {growthStat.label}</span>
             </div>

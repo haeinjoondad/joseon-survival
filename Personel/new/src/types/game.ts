@@ -2,6 +2,8 @@ export type WorkType = 'petition' | 'complaint' | 'meeting'
 
 export type TabType = 'main' | 'work' | 'stats' | 'promotion'
 
+export type KingMood = 'pleased' | 'calm' | 'irritated' | 'furious'
+
 export interface Stats {
   writing: number   // 필력
   sense: number     // 눈치
@@ -26,6 +28,9 @@ export interface Player {
   equipment: Equipment
   statExp: Stats          // 능력치 경험치
   currentWork: WorkType
+  kingMood: KingMood      // 임금의 현재 기분
+  ledgerManipulation: boolean // 장부 조작 사용 여부
+  ledgerHeat: number      // 장부 조작 의심도
   lastSaveTime: number    // timestamp for offline reward
 }
 

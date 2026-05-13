@@ -42,6 +42,7 @@ export default function App() {
     isGameOver,
     startGame,
     setWork,
+    setLedgerManipulation,
     upgradeEquipment,
     upgradeStat,
     recoverMental,
@@ -176,6 +177,7 @@ export default function App() {
           <WorkPanel
             player={player}
             onSetWork={setWork}
+            onSetLedgerManipulation={setLedgerManipulation}
             onRecover={() => recoverMental(30)}
             onRecoverStamina={() => recoverStamina(30)}
           />

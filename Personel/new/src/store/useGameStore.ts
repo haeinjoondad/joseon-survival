@@ -4,6 +4,15 @@ import type { GameEvent, EventChoice } from '../types/event'
 import { WORKS } from '../data/works'
 import { RANKS, MAX_RANK_INDEX } from '../data/ranks'
 import { EVENTS, TUTORIAL_EVENT } from '../data/events'
+import {
+  HALF_HOUR_MS,
+  KING_MOODS,
+  LEDGER_HEAT_DECAY_PER_SECOND,
+  LEDGER_MERIT_MULTIPLIER,
+  getLedgerHeatGainPerSecond,
+  getLedgerInspectionChance,
+  pickKingMood,
+} from '../data/balance'
 import { loadCloudSave, saveCloudPlayer } from '../lib/supabase'
 
 const SAVE_KEY = 'joseon_save'
@@ -11,7 +20,6 @@ const TICK_MS = 1000
 const MAX_OFFLINE_HOURS = 8
 const OFFLINE_MIN_MENTAL = 10
 const OFFLINE_REWARD_THRESHOLD_SECONDS = 30
-const HALF_HOUR_MS = 30 * 60 * 1000  // 정각·30분 슬롯 단위
 const MAX_REPUTATION = 100
 const ROBE_REPUTATION_PER_LEVEL_PER_HOUR = 0.25
 const COMPLAINT_REPUTATION_PER_HOUR = 3
@@ -21,6 +29,15 @@ const DEFAULT_PROMOTION_REPUTATION_COST_BASE = 30
 
 const clampReputation = (value: number) =>
   Math.min(MAX_REPUTATION, Math.max(0, value))
+
+function normalizePlayer(player: Player): Player {
+  return {
+    ...player,
+    kingMood: player.kingMood ?? 'calm',
+    ledgerManipulation: player.ledgerManipulation ?? false,
+    ledgerHeat: player.ledgerHeat ?? 0,
+  }
+}
 
 function createNewPlayer(name: string): Player {
   return {
@@ -35,6 +52,9 @@ function createNewPlayer(name: string): Player {
     equipment: { brush: 1, desk: 1, robe: 1 },
     statExp: { writing: 0, sense: 0, politics: 0 },
     currentWork: 'petition',
+    kingMood: 'calm',
+    ledgerManipulation: false,
+    ledgerHeat: 0,
     lastSaveTime: Date.now(),
   }
 }
@@ -42,30 +62,36 @@ function createNewPlayer(name: string): Player {
 function loadPlayer(): Player | null {
   try {
     const raw = localStorage.getItem(SAVE_KEY)
-    return raw ? (JSON.parse(raw) as Player) : null
+    return raw ? normalizePlayer(JSON.parse(raw) as Player) : null
   } catch {
     return null
   }
 }
 
 function savePlayer(player: Player) {
-  localStorage.setItem(SAVE_KEY, JSON.stringify({ ...player, lastSaveTime: Date.now() }))
+  localStorage.setItem(SAVE_KEY, JSON.stringify({ ...normalizePlayer(player), lastSaveTime: Date.now() }))
 }
 
 function calcTick(player: Player, seconds: number): Partial<Player> {
   const work = WORKS.find(w => w.id === player.currentWork)!
+  const mood = KING_MOODS[player.kingMood]
   const statBonus = 1 + (player.stats[work.statScaling] - 1) * 0.1
   const brushBonus = 1 + (player.equipment.brush - 1) * 0.05
   const deskBonus = 1 + (player.equipment.desk - 1) * 0.03
   const robeEnhancementLevel = Math.max(0, player.equipment.robe - 1)
+  const moodMeritBonus = work.id === 'petition' ? mood.meritMultiplier : 1
+  const ledgerBonus = player.ledgerManipulation ? LEDGER_MERIT_MULTIPLIER : 1
 
   // 체력 패널티: 30 미만이면 -20%, 0이면 -50%
   const staminaPenalty = player.stamina === 0 ? 0.5 : player.stamina < 30 ? 0.8 : 1
 
-  const meritGain = work.meritPerSec * statBonus * brushBonus * deskBonus * staminaPenalty * seconds
+  const meritGain = work.meritPerSec * statBonus * brushBonus * deskBonus * staminaPenalty * moodMeritBonus * ledgerBonus * seconds
   const salaryGain = work.salaryPerSec * deskBonus * seconds
-  const mentalLoss = work.mentalCost / 60 * seconds
+  const mentalLoss = work.mentalCost * mood.mentalCostMultiplier / 60 * seconds
   const staminaLoss = work.staminaCost / 60 * seconds
+  const ledgerHeatChange = player.ledgerManipulation
+    ? getLedgerHeatGainPerSecond(player.ledgerHeat) * seconds
+    : -LEDGER_HEAT_DECAY_PER_SECOND * seconds
   const robePassiveRepGainPerHour = robeEnhancementLevel * ROBE_REPUTATION_PER_LEVEL_PER_HOUR
   const robePassiveRepGain = robePassiveRepGainPerHour * (seconds / 3600)
   const complaintRepGain = work.id === 'complaint'
@@ -78,6 +104,7 @@ function calcTick(player: Player, seconds: number): Partial<Player> {
     mental: Math.max(0, player.mental - mentalLoss),
     stamina: Math.max(0, player.stamina - staminaLoss),
     reputation: clampReputation(player.reputation + robePassiveRepGain + complaintRepGain),
+    ledgerHeat: Math.min(100, Math.max(0, player.ledgerHeat + ledgerHeatChange)),
   }
 }
 
@@ -292,16 +319,17 @@ export function useGameStore({ userId = null }: UseGameStoreOptions = {}) {
           return
         }
 
-        cloudPlayerRef.current = save.player
+        const accountPlayer = normalizePlayer(save.player)
+        cloudPlayerRef.current = accountPlayer
 
-        if (local && JSON.stringify(local) !== JSON.stringify(save.player)) {
+        if (local && JSON.stringify(local) !== JSON.stringify(accountPlayer)) {
           setSaveConflict(true)
           setCloudStatus(null)
           return
         }
 
-        savePlayer(save.player)
-        setPlayer(save.player)
+        savePlayer(accountPlayer)
+        setPlayer(accountPlayer)
         setCloudStatus('계정 저장본을 불러왔습니다')
       })
       .catch(() => {
@@ -319,8 +347,7 @@ export function useGameStore({ userId = null }: UseGameStoreOptions = {}) {
         if (!prev) return prev
         const tickResult = calcTick(prev, 1)
         const expResult = calcStatExp(prev, 1)
-        const updated = { ...prev, ...tickResult, ...expResult }
-        persistPlayer(updated)
+        let updated = { ...prev, ...tickResult, ...expResult }
 
         // 멘탈 0 → 게임오버
         if (updated.mental === 0) {
@@ -331,6 +358,39 @@ export function useGameStore({ userId = null }: UseGameStoreOptions = {}) {
         const currentSlot = Math.floor(Date.now() / HALF_HOUR_MS)
         if (currentSlot !== lastEventSlot.current) {
           lastEventSlot.current = currentSlot
+          const nextMood = pickKingMood()
+          updated = { ...updated, kingMood: nextMood }
+
+          if (updated.ledgerManipulation) {
+            const inspectionChance = getLedgerInspectionChance(updated.ledgerHeat, nextMood)
+
+            if (Math.random() < inspectionChance) {
+              const before = updated
+              updated = {
+                ...updated,
+                ledgerManipulation: false,
+                ledgerHeat: 0,
+                merit: Math.floor(updated.merit * 0.75),
+                salary: Math.max(0, updated.salary - 100),
+                mental: Math.max(0, updated.mental - 25),
+                reputation: clampReputation(updated.reputation - 25),
+                rankIndex: updated.ledgerHeat >= 70 ? Math.max(0, updated.rankIndex - 1) : updated.rankIndex,
+              }
+              setEventResult({
+                choiceText: '장부 조작',
+                success: false,
+                message: '암행어사가 장부의 빈틈을 잡아냈습니다. 조작은 중단되고 자산과 평판이 크게 깎였습니다.',
+                effects: {
+                  공적: Math.floor(updated.merit - before.merit),
+                  녹봉: Math.floor(updated.salary - before.salary),
+                  멘탈: Math.floor(updated.mental - before.mental),
+                  평판: Math.floor(updated.reputation - before.reputation),
+                  ...(updated.rankIndex < before.rankIndex ? { 품계: -1 } : {}),
+                },
+              })
+            }
+          }
+
           setActiveEvent(current => {
             if (current) return current  // 이미 이벤트 중이면 유지
             const ev = pickEvent(updated, recentEventIds.current)
@@ -341,6 +401,7 @@ export function useGameStore({ userId = null }: UseGameStoreOptions = {}) {
           })
         }
 
+        persistPlayer(updated)
         return updated
       })
     }, TICK_MS)
@@ -397,7 +458,7 @@ export function useGameStore({ userId = null }: UseGameStoreOptions = {}) {
     setPlayer(p)
     // 게임 시작 직후 튜토리얼 첫 이벤트 발생
     setTimeout(() => setActiveEvent(TUTORIAL_EVENT), 800)
-  }, [])
+  }, [persistPlayer])
 
   const setWork = useCallback((work: WorkType) => {
     setPlayer(prev => {
@@ -406,7 +467,16 @@ export function useGameStore({ userId = null }: UseGameStoreOptions = {}) {
       persistPlayer(updated)
       return updated
     })
-  }, [])
+  }, [persistPlayer])
+
+  const setLedgerManipulation = useCallback((enabled: boolean) => {
+    setPlayer(prev => {
+      if (!prev) return prev
+      const updated = { ...prev, ledgerManipulation: enabled }
+      persistPlayer(updated)
+      return updated
+    })
+  }, [persistPlayer])
 
   const upgradeEquipment = useCallback((slot: keyof Player['equipment']) => {
     setPlayer(prev => {
@@ -472,7 +542,8 @@ export function useGameStore({ userId = null }: UseGameStoreOptions = {}) {
     const meritBonus = Math.min(30, (player.merit - nextRank.meritRequired) / nextRank.meritRequired * 20)
     const repBonus = Math.min(20, (player.reputation - nextRank.reputationRequired) * 0.5)
     const politicsBonus = Math.min(10, (player.stats.politics - 1) * 2)
-    const successRate = basePct + meritBonus + repBonus + politicsBonus
+    const moodBonus = KING_MOODS[player.kingMood].promotionBonus
+    const successRate = Math.max(0, Math.min(99, basePct + meritBonus + repBonus + politicsBonus + moodBonus))
 
     const success = Math.random() * 100 < successRate
     const requiredReputationForCost = nextRank?.reputationRequired ?? DEFAULT_PROMOTION_REPUTATION_COST_BASE
@@ -550,6 +621,7 @@ export function useGameStore({ userId = null }: UseGameStoreOptions = {}) {
     dismissPromotion: () => setPromotionCelebration(null),
     startGame,
     setWork,
+    setLedgerManipulation,
     upgradeEquipment,
     upgradeStat,
     recoverMental,

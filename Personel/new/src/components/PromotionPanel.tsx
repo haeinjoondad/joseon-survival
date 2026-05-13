@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { Player } from '../types/game'
 import { RANKS, MAX_RANK_INDEX } from '../data/ranks'
+import { KING_MOODS } from '../data/balance'
 
 interface Props {
   player: Player
@@ -26,7 +27,8 @@ export function PromotionPanel({ player, onAttempt }: Props) {
     ? Math.min(20, (player.reputation - nextRank.reputationRequired) * 0.5)
     : 0
   const politicsBonus = Math.min(10, (player.stats.politics - 1) * 2)
-  const successRate = Math.max(0, Math.min(99, basePct + meritBonus + repBonus + politicsBonus))
+  const moodBonus = KING_MOODS[player.kingMood].promotionBonus
+  const successRate = Math.max(0, Math.min(99, basePct + meritBonus + repBonus + politicsBonus + moodBonus))
   const reputationCost = nextRank ? Math.floor(nextRank.reputationRequired * 0.5) : 0
 
   function handleAttempt() {
@@ -102,8 +104,9 @@ export function PromotionPanel({ player, onAttempt }: Props) {
                 </div>
               )}
               {meritOk && repOk && reputationCost > 0 && (
-                <div className="text-blue-300 text-xs mt-2">
-                  성공 시 평판 {reputationCost} 소모
+                <div className="text-blue-300 text-xs mt-2 flex justify-between gap-3">
+                  <span>왕심 보정 {moodBonus >= 0 ? '+' : ''}{moodBonus}%</span>
+                  <span>성공 시 평판 {reputationCost} 소모</span>
                 </div>
               )}
             </div>
