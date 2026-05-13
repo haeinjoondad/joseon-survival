@@ -33,9 +33,10 @@ export function PromotionPanel({ player, onAttempt }: Props) {
     ? 100
     : Math.max(0, Math.min(99, basePct + meritBonus + repBonus + politicsBonus + moodBonus))
   const reputationCost = nextRank ? Math.floor(nextRank.reputationRequired * 0.5) : 0
+  const canAttempt = Boolean(nextRank && meritOk && repOk && !isAnimating)
 
   function handleAttempt() {
-    if (isAnimating) return
+    if (!canAttempt) return
     setIsAnimating(true)
     setResult(null)
     setTimeout(() => {
@@ -118,8 +119,12 @@ export function PromotionPanel({ player, onAttempt }: Props) {
           {/* 심사 버튼 */}
           <button
             onClick={handleAttempt}
-            disabled={isAnimating}
-            className="w-full bg-seal hover:bg-red-700 disabled:opacity-60 text-hanji font-bold py-4 rounded-lg text-lg transition-colors border border-red-800"
+            disabled={!canAttempt}
+            className={`w-full text-hanji font-bold py-4 rounded-lg text-lg transition-colors border ${
+              canAttempt
+                ? 'bg-seal hover:bg-red-700 border-red-800'
+                : 'bg-stone-700 text-stone-500 border-stone-600 cursor-not-allowed'
+            }`}
           >
             {isAnimating ? (
               <span className="animate-pulse">심사 중...</span>

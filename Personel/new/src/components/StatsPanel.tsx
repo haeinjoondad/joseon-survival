@@ -7,18 +7,18 @@ interface Props {
 }
 
 const STAT_INFO = {
-  writing: { label: '필력', emoji: '✍️', desc: '상소문 효율 +10%/레벨' },
-  sense:   { label: '눈치', emoji: '👁️', desc: '위기 회피 확률 증가' },
+  writing: { label: '필력', emoji: '🖌️', desc: '상소문 효율 +10%/레벨' },
+  sense: { label: '눈치', emoji: '👁️', desc: '민원 처리 효율 +10%/레벨' },
   politics: { label: '정치력', emoji: '🏛️', desc: '승진 심사 보정 +2%/레벨' },
 }
 
 const EQUIP_INFO = {
-  brush: { label: '붓',   emoji: '🖊️', desc: '강화 1회당 공적 획득 +5%' },
-  desk:  { label: '책상', emoji: '🪑', desc: '강화 1회당 공적·녹봉 획득 +3%' },
-  robe:  {
+  brush: { label: '붓', emoji: '🖌️', desc: '강화 1회당 공적 획득 +5%' },
+  desk: { label: '책상', emoji: '🪑', desc: '강화 1회당 공적·녹봉 획득 +3%' },
+  robe: {
     label: '관복',
-    emoji: '👘',
-    desc: ['평판 +0.25/시간 (항상)', '민원 처리 평판 +2%/강화'],
+    emoji: '🧥',
+    desc: '강화 1회당 평판 +0.25/시간 · 민원 평판 +2%',
   },
 }
 
@@ -26,20 +26,19 @@ function getEquipEffect(slot: keyof Player['equipment'], level: number) {
   const upgrades = Math.max(0, level - 1)
 
   if (slot === 'brush') {
-    return `현재 공적 +${upgrades * 5}%`
+    return `현재 효과: 공적 +${upgrades * 5}%`
   }
 
   if (slot === 'desk') {
-    return `현재 공적·녹봉 +${upgrades * 3}%`
+    return `현재 효과: 공적·녹봉 +${upgrades * 3}%`
   }
 
-  return `현재 평판 +${(upgrades * 0.25).toFixed(2)}/시간 · 민원 +${upgrades * 2}%`
+  return `현재 효과: 평판 +${(upgrades * 0.25).toFixed(2)}/시간 · 민원 +${upgrades * 2}%`
 }
 
 export function StatsPanel({ player, onUpgradeStat, onUpgradeEquip }: Props) {
   return (
     <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
-      {/* 능력치 */}
       <section>
         <h2 className="text-hanji text-sm font-bold text-center mb-3">── 능력치 강화 ──</h2>
         <div className="space-y-2">
@@ -69,7 +68,6 @@ export function StatsPanel({ player, onUpgradeStat, onUpgradeEquip }: Props) {
                     강화<br />{cost}냥
                   </button>
                 </div>
-                {/* 경험치 바 */}
                 <div className="mt-2">
                   <div className="flex justify-between text-xs text-stone-500 mb-1">
                     <span>자동 경험치</span>
@@ -88,7 +86,6 @@ export function StatsPanel({ player, onUpgradeStat, onUpgradeEquip }: Props) {
         </div>
       </section>
 
-      {/* 장비 강화 */}
       <section>
         <h2 className="text-hanji text-sm font-bold text-center mb-3">── 장비 강화 ──</h2>
         <div className="space-y-2">
@@ -105,11 +102,7 @@ export function StatsPanel({ player, onUpgradeStat, onUpgradeEquip }: Props) {
                     <div className="text-hanji text-sm font-bold">
                       {info.label} <span className="text-green-400">+{player.equipment[key]}</span>
                     </div>
-                    <div className="text-stone-500 text-xs leading-4">
-                      {Array.isArray(info.desc)
-                        ? info.desc.map(line => <div key={line}>{line}</div>)
-                        : info.desc}
-                    </div>
+                    <div className="text-stone-500 text-xs leading-4">{info.desc}</div>
                     <div className="text-green-400/80 text-xs mt-0.5">
                       {getEquipEffect(key, player.equipment[key])}
                     </div>

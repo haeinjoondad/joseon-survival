@@ -10,7 +10,7 @@ import {
 const COMPLAINT_REPUTATION_PER_HOUR = 3
 const ROBE_COMPLAINT_REPUTATION_BONUS_PER_LEVEL = 0.02
 const STAT_LABELS = {
-  writing: { emoji: '✍️', label: '필력' },
+  writing: { emoji: '🖌️', label: '필력' },
   sense: { emoji: '👁️', label: '눈치' },
   politics: { emoji: '🏛️', label: '정치력' },
 }
@@ -40,6 +40,7 @@ export function WorkPanel({ player, onSetWork, onSetLedgerManipulation, onRecove
   const ledgerInspectionChance = player.ledgerManipulation
     ? getLedgerInspectionChance(player.ledgerHeat, player.kingMood)
     : 0
+  const canRecoverStamina = player.stamina < 100 && player.salary >= 50
 
   return (
     <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
@@ -106,7 +107,7 @@ export function WorkPanel({ player, onSetWork, onSetLedgerManipulation, onRecove
                 <span className="text-hanji font-bold text-sm">{work.name}</span>
               </div>
               {isActive && (
-                <span className="text-amber-400 text-xs animate-pulse">● 진행 중</span>
+                <span className="text-amber-400 text-xs animate-pulse">진행 중</span>
               )}
             </div>
             <p className="text-stone-400 text-xs mb-2">{work.description}</p>
@@ -116,27 +117,33 @@ export function WorkPanel({ player, onSetWork, onSetLedgerManipulation, onRecove
               {work.id === 'complaint' && (
                 <span className="text-blue-400">👥 +{complaintReputationPerHour.toFixed(2)}/시간</span>
               )}
-              <span className="text-purple-400">🧠 -{(work.mentalCost * mood.mentalCostMultiplier).toFixed(1)}/분</span>
-              <span className="text-red-400">❤️ -{work.staminaCost.toFixed(1)}/분</span>
+              <span className="text-purple-400">멘탈 -{(work.mentalCost * mood.mentalCostMultiplier).toFixed(1)}/분</span>
+              <span className="text-red-400">체력 -{work.staminaCost.toFixed(1)}/분</span>
               <span className="text-stone-300">{growthStat.emoji} {growthStat.label}</span>
             </div>
           </button>
         )
       })}
 
-      {/* 회복 버튼 영역 */}
       <div className="mt-4 pt-4 border-t border-stone-700 space-y-2">
-
-        {/* 체력 경고 */}
         {player.stamina < 30 && (
-          <div className={`text-xs text-center px-3 py-2 rounded-lg ${
+          <div className={`text-xs px-3 py-2 rounded-lg flex items-center justify-between gap-3 ${
             player.stamina === 0
               ? 'bg-red-950 text-red-400 border border-red-800'
               : 'bg-orange-950 text-orange-400 border border-orange-800'
           }`}>
-            {player.stamina === 0
-              ? '⚠️ 체력 고갈 — 공적 생산 -50%'
-              : '⚠️ 체력 부족 — 공적 생산 -20%'}
+            <span>
+              {player.stamina === 0
+                ? '⚠️ 체력 고갈 — 공적 생산 -50%'
+                : '⚠️ 체력 부족 — 공적 생산 -20%'}
+            </span>
+            <button
+              onClick={onRecoverStamina}
+              disabled={!canRecoverStamina}
+              className="shrink-0 bg-red-800 hover:bg-red-700 disabled:bg-stone-700 disabled:text-stone-500 disabled:cursor-not-allowed text-hanji rounded px-2 py-1 transition-colors"
+            >
+              {player.salary < 50 ? '녹봉 부족' : '잠깐 휴식'}
+            </button>
           </div>
         )}
 
@@ -151,7 +158,7 @@ export function WorkPanel({ player, onSetWork, onSetLedgerManipulation, onRecove
 
         <button
           onClick={onRecoverStamina}
-          disabled={player.stamina >= 100 || player.salary < 50}
+          disabled={!canRecoverStamina}
           className="w-full bg-red-900 hover:bg-red-800 disabled:opacity-40 disabled:cursor-not-allowed text-hanji py-3 rounded-lg border border-red-700 text-sm transition-colors flex items-center justify-center gap-2"
         >
           <span>🛏️ 잠깐 휴식</span>
