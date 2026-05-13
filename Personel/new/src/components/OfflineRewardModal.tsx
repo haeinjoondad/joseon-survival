@@ -1,6 +1,7 @@
 interface Props {
   merit: number
   salary: number
+  reputation: number
   workedSeconds: number
   stoppedByMental: boolean
   onDismiss: () => void
@@ -13,7 +14,9 @@ function formatDuration(seconds: number) {
   return `${Math.max(1, minutes)}분`
 }
 
-export function OfflineRewardModal({ merit, salary, workedSeconds, stoppedByMental, onDismiss }: Props) {
+export function OfflineRewardModal({ merit, salary, reputation, workedSeconds, stoppedByMental, onDismiss }: Props) {
+  const hasReputationReward = reputation >= 0.01
+
   return (
     <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-6">
       <div className="bg-stone-900 border border-amber-700 rounded-xl p-6 w-full max-w-sm text-center shadow-2xl">
@@ -38,6 +41,12 @@ export function OfflineRewardModal({ merit, salary, workedSeconds, stoppedByMent
             <span className="text-stone-400 text-sm">💰 획득 녹봉</span>
             <span className="text-green-400 font-bold">+{salary.toLocaleString()}</span>
           </div>
+          {hasReputationReward && (
+            <div className="flex justify-between">
+              <span className="text-stone-400 text-sm">👥 획득 평판</span>
+              <span className="text-blue-400 font-bold">+{reputation.toFixed(2)}</span>
+            </div>
+          )}
         </div>
 
         {stoppedByMental && (

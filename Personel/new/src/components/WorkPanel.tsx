@@ -24,7 +24,12 @@ export function WorkPanel({ player, onSetWork, onRecover, onRecoverStamina }: Pr
       {WORKS.map(work => {
         const isActive = player.currentWork === work.id
         const statVal = player.stats[work.statScaling]
-        const bonus = (1 + (statVal - 1) * 0.1).toFixed(1)
+        const statBonus = 1 + (statVal - 1) * 0.1
+        const brushBonus = 1 + (player.equipment.brush - 1) * 0.05
+        const deskBonus = 1 + (player.equipment.desk - 1) * 0.03
+        const staminaPenalty = player.stamina === 0 ? 0.5 : player.stamina < 30 ? 0.8 : 1
+        const meritPerSecond = work.meritPerSec * statBonus * brushBonus * deskBonus * staminaPenalty
+        const salaryPerSecond = work.salaryPerSec * deskBonus
         const robeEnhancementLevel = Math.max(0, player.equipment.robe - 1)
         const complaintReputationPerHour = COMPLAINT_REPUTATION_PER_HOUR *
           (1 + robeEnhancementLevel * ROBE_COMPLAINT_REPUTATION_BONUS_PER_LEVEL)
@@ -51,8 +56,8 @@ export function WorkPanel({ player, onSetWork, onRecover, onRecoverStamina }: Pr
             </div>
             <p className="text-stone-400 text-xs mb-2">{work.description}</p>
             <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs">
-              <span className="text-amber-300">⚔ +{(work.meritPerSec * parseFloat(bonus)).toFixed(1)}/초</span>
-              <span className="text-green-400">💰 +{work.salaryPerSec.toFixed(1)}/초</span>
+              <span className="text-amber-300">⚔ +{meritPerSecond.toFixed(1)}/초</span>
+              <span className="text-green-400">💰 +{salaryPerSecond.toFixed(1)}/초</span>
               {work.id === 'complaint' && (
                 <span className="text-blue-400">👥 +{complaintReputationPerHour.toFixed(2)}/시간</span>
               )}

@@ -10,6 +10,7 @@ const SAVE_KEY = 'joseon_save'
 const TICK_MS = 1000
 const MAX_OFFLINE_HOURS = 8
 const OFFLINE_MIN_MENTAL = 10
+const OFFLINE_REWARD_THRESHOLD_SECONDS = 30
 const HALF_HOUR_MS = 30 * 60 * 1000  // 정각·30분 슬롯 단위
 const MAX_REPUTATION = 100
 const ROBE_REPUTATION_PER_LEVEL_PER_HOUR = 0.25
@@ -91,6 +92,42 @@ function calcOfflineWorkSeconds(player: Player, elapsedSeconds: number) {
   return Math.min(elapsedSeconds, Math.max(0, secondsUntilRest))
 }
 
+interface OfflineReward {
+  merit: number
+  salary: number
+  reputation: number
+  workedSeconds: number
+  stoppedByMental: boolean
+}
+
+function calculateOfflineProgress(saved: Player, elapsedSeconds: number): {
+  updated: Player
+  reward: OfflineReward
+} {
+  const workedSeconds = calcOfflineWorkSeconds(saved, elapsedSeconds)
+  const stoppedByMental = workedSeconds < elapsedSeconds
+  const reward = calcTick(saved, workedSeconds)
+  const rewardMerit = (reward.merit ?? saved.merit) - saved.merit
+  const rewardSalary = (reward.salary ?? saved.salary) - saved.salary
+  const rewardReputation = (reward.reputation ?? saved.reputation) - saved.reputation
+  const updated = {
+    ...saved,
+    ...reward,
+    mental: stoppedByMental ? OFFLINE_MIN_MENTAL : (reward.mental ?? saved.mental),
+  }
+
+  return {
+    updated,
+    reward: {
+      merit: Math.floor(rewardMerit),
+      salary: Math.floor(rewardSalary),
+      reputation: rewardReputation,
+      workedSeconds: Math.floor(workedSeconds),
+      stoppedByMental,
+    },
+  }
+}
+
 function calcStatExp(player: Player, seconds: number): Partial<Player> {
   const work = WORKS.find(w => w.id === player.currentWork)!
   const key = work.statScaling
@@ -134,12 +171,7 @@ interface UseGameStoreOptions {
 
 export function useGameStore({ userId = null }: UseGameStoreOptions = {}) {
   const [player, setPlayer] = useState<Player | null>(null)
-  const [offlineReward, setOfflineReward] = useState<{
-    merit: number
-    salary: number
-    workedSeconds: number
-    stoppedByMental: boolean
-  } | null>(null)
+  const [offlineReward, setOfflineReward] = useState<OfflineReward | null>(null)
   const [activeEvent, setActiveEvent] = useState<GameEvent | null>(null)
   const [eventResult, setEventResult] = useState<EventResult | null>(null)
   const [isGameOver, setIsGameOver] = useState(false)
@@ -188,28 +220,49 @@ export function useGameStore({ userId = null }: UseGameStoreOptions = {}) {
         (Date.now() - saved.lastSaveTime) / 1000,
         MAX_OFFLINE_HOURS * 3600
       )
-      if (elapsed > 30) {
-        const workedSeconds = calcOfflineWorkSeconds(saved, elapsed)
-        const stoppedByMental = workedSeconds < elapsed
-        const reward = calcTick(saved, workedSeconds)
-        const rewardMerit = (reward.merit ?? saved.merit) - saved.merit
-        const rewardSalary = (reward.salary ?? saved.salary) - saved.salary
-        const updated = {
-          ...saved,
-          ...reward,
-          mental: stoppedByMental ? OFFLINE_MIN_MENTAL : (reward.mental ?? saved.mental),
-        }
-        setOfflineReward({
-          merit: Math.floor(rewardMerit),
-          salary: Math.floor(rewardSalary),
-          workedSeconds: Math.floor(workedSeconds),
-          stoppedByMental,
-        })
+      if (elapsed > OFFLINE_REWARD_THRESHOLD_SECONDS) {
+        const { updated, reward } = calculateOfflineProgress(saved, elapsed)
+        setOfflineReward(reward)
         setPlayer(updated)
         persistPlayer(updated)
       } else {
         setPlayer(saved)
       }
+    }
+  }, [persistPlayer])
+
+  useEffect(() => {
+    const applyResumeOfflineProgress = () => {
+      if (document.visibilityState !== 'visible') return
+
+      const saved = loadPlayer()
+      if (!saved) return
+
+      const elapsed = Math.min(
+        (Date.now() - saved.lastSaveTime) / 1000,
+        MAX_OFFLINE_HOURS * 3600
+      )
+      if (elapsed <= OFFLINE_REWARD_THRESHOLD_SECONDS) return
+
+      const { updated, reward } = calculateOfflineProgress(saved, elapsed)
+      lastEventSlot.current = Math.floor(Date.now() / HALF_HOUR_MS)
+      setOfflineReward(reward)
+      setPlayer(updated)
+      persistPlayer(updated)
+    }
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        applyResumeOfflineProgress()
+      }
+    }
+
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    window.addEventListener('focus', applyResumeOfflineProgress)
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+      window.removeEventListener('focus', applyResumeOfflineProgress)
     }
   }, [persistPlayer])
 
@@ -324,9 +377,9 @@ export function useGameStore({ userId = null }: UseGameStoreOptions = {}) {
       if (e.mental)     { next.mental     = Math.min(100, Math.max(0, prev.mental     + e.mental));     effects['멘탈']  = e.mental }
       if (e.stamina)    { next.stamina    = Math.min(100, Math.max(0, prev.stamina    + e.stamina));    effects['체력']  = e.stamina }
       if (e.reputation) { next.reputation = clampReputation(prev.reputation + e.reputation); effects['평판']  = e.reputation }
-      if (e.writingExp) { next.statExp = { ...next.statExp, writing:  next.statExp.writing  + e.writingExp  } }
-      if (e.senseExp)   { next.statExp = { ...next.statExp, sense:    next.statExp.sense    + e.senseExp    } }
-      if (e.politicsExp){ next.statExp = { ...next.statExp, politics: next.statExp.politics + e.politicsExp } }
+      if (e.writingExp) { next.statExp = { ...next.statExp, writing:  next.statExp.writing  + e.writingExp  }; effects['필력 경험치'] = e.writingExp }
+      if (e.senseExp)   { next.statExp = { ...next.statExp, sense:    next.statExp.sense    + e.senseExp    }; effects['눈치 경험치'] = e.senseExp }
+      if (e.politicsExp){ next.statExp = { ...next.statExp, politics: next.statExp.politics + e.politicsExp }; effects['정치력 경험치'] = e.politicsExp }
 
       persistPlayer(next)
       return next

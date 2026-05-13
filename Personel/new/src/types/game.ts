@@ -43,7 +43,7 @@ export interface WorkInfo {
   description: string
   meritPerSec: number
   salaryPerSec: number
-  mentalCost: number      // 시간당 멘탈 소모
-  staminaCost: number
+  mentalCost: number      // 분당 멘탈 소모
+  staminaCost: number     // 분당 체력 소모
   statScaling: keyof Stats
 }

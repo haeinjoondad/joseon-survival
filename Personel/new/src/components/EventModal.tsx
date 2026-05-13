@@ -23,6 +23,19 @@ function StatBadge({ stat, value, threshold }: { stat: string; value: number; th
   )
 }
 
+const EFFECT_LABELS: Record<string, string> = {
+  merit: '공적',
+  salary: '녹봉',
+  mental: '멘탈',
+  stamina: '체력',
+  reputation: '평판',
+  writingExp: '필력 경험치',
+  senseExp: '눈치 경험치',
+  politicsExp: '정치력 경험치',
+}
+
+const VISIBLE_EFFECT_KEYS = Object.keys(EFFECT_LABELS)
+
 export function EventModal({ event, player, onChoose }: EventProps) {
   return (
     <div className="fixed inset-0 bg-black/75 flex items-end justify-center z-50 p-4 pb-6">
@@ -67,13 +80,12 @@ export function EventModal({ event, player, onChoose }: EventProps) {
                 {choice.effect && !hasCheck && (
                   <div className="flex flex-wrap gap-1 mt-1">
                     {Object.entries(choice.effect)
-                      .filter(([k]) => ['merit','salary','mental','stamina','reputation'].includes(k))
+                      .filter(([k]) => VISIBLE_EFFECT_KEYS.includes(k))
                       .map(([k, v]) => {
-                        const labels: Record<string,string> = { merit:'공적', salary:'녹봉', mental:'멘탈', stamina:'체력', reputation:'평판' }
                         const pos = (v as number) >= 0
                         return (
                           <span key={k} className={`text-xs ${pos ? 'text-green-400' : 'text-red-400'}`}>
-                            {labels[k]} {pos ? '+' : ''}{v as number}
+                            {EFFECT_LABELS[k]} {pos ? '+' : ''}{v as number}
                           </span>
                         )
                       })}

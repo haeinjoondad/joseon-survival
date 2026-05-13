@@ -27,6 +27,7 @@ export function PromotionPanel({ player, onAttempt }: Props) {
     : 0
   const politicsBonus = Math.min(10, (player.stats.politics - 1) * 2)
   const successRate = Math.max(0, Math.min(99, basePct + meritBonus + repBonus + politicsBonus))
+  const reputationCost = nextRank ? Math.floor(nextRank.reputationRequired * 0.5) : 0
 
   function handleAttempt() {
     if (isAnimating) return
@@ -98,6 +99,11 @@ export function PromotionPanel({ player, onAttempt }: Props) {
                     className="bg-amber-500 h-2 rounded-full transition-all"
                     style={{ width: `${successRate}%` }}
                   />
+                </div>
+              )}
+              {meritOk && repOk && reputationCost > 0 && (
+                <div className="text-blue-300 text-xs mt-2">
+                  성공 시 평판 {reputationCost} 소모
                 </div>
               )}
             </div>
