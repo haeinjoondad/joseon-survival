@@ -113,8 +113,12 @@ export default function App() {
           merit={offlineReward.merit}
           salary={offlineReward.salary}
           reputation={offlineReward.reputation}
+          workId={offlineReward.workId}
           workedSeconds={offlineReward.workedSeconds}
+          stoppedAfterSeconds={offlineReward.stoppedAfterSeconds}
           stoppedByMental={offlineReward.stoppedByMental}
+          canRecoverMental={(player?.salary ?? 0) >= 50 && (player?.mental ?? 100) < 100}
+          onRecoverMental={() => recoverMental(30)}
           onDismiss={dismissOfflineReward}
         />
       )}

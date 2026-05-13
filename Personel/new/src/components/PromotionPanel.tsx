@@ -28,7 +28,10 @@ export function PromotionPanel({ player, onAttempt }: Props) {
     : 0
   const politicsBonus = Math.min(10, (player.stats.politics - 1) * 2)
   const moodBonus = KING_MOODS[player.kingMood].promotionBonus
-  const successRate = Math.max(0, Math.min(99, basePct + meritBonus + repBonus + politicsBonus + moodBonus))
+  const isTutorialPromotion = player.rankIndex === 0
+  const successRate = isTutorialPromotion
+    ? 100
+    : Math.max(0, Math.min(99, basePct + meritBonus + repBonus + politicsBonus + moodBonus))
   const reputationCost = nextRank ? Math.floor(nextRank.reputationRequired * 0.5) : 0
 
   function handleAttempt() {

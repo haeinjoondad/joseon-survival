@@ -21,7 +21,7 @@ const TICK_MS = 1000
 const MAX_OFFLINE_HOURS = 8
 const OFFLINE_MIN_MENTAL = 10
 const OFFLINE_REWARD_THRESHOLD_SECONDS = 30
-const OFFLINE_REWARD_MODAL_THRESHOLD_SECONDS = 5 * 60
+const OFFLINE_REWARD_MODAL_THRESHOLD_SECONDS = 15 * 60
 const MAX_REPUTATION = 100
 const ROBE_REPUTATION_PER_LEVEL_PER_HOUR = 0.25
 const COMPLAINT_REPUTATION_PER_HOUR = 3
@@ -125,7 +125,9 @@ interface OfflineReward {
   merit: number
   salary: number
   reputation: number
+  workId: WorkType
   workedSeconds: number
+  stoppedAfterSeconds: number | null
   stoppedByMental: boolean
 }
 
@@ -151,7 +153,9 @@ function calculateOfflineProgress(saved: Player, elapsedSeconds: number): {
       merit: Math.floor(rewardMerit),
       salary: Math.floor(rewardSalary),
       reputation: rewardReputation,
+      workId: saved.currentWork,
       workedSeconds: Math.floor(workedSeconds),
+      stoppedAfterSeconds: stoppedByMental ? Math.floor(workedSeconds) : null,
       stoppedByMental,
     },
   }
@@ -252,7 +256,7 @@ export function useGameStore({ userId = null }: UseGameStoreOptions = {}) {
       )
       if (elapsed > OFFLINE_REWARD_THRESHOLD_SECONDS) {
         const { updated, reward } = calculateOfflineProgress(saved, elapsed)
-        if (elapsed >= OFFLINE_REWARD_MODAL_THRESHOLD_SECONDS) {
+        if (reward.stoppedByMental || elapsed >= OFFLINE_REWARD_MODAL_THRESHOLD_SECONDS) {
           setOfflineReward(reward)
         }
         setPlayer(updated)
@@ -279,7 +283,7 @@ export function useGameStore({ userId = null }: UseGameStoreOptions = {}) {
       const { updated, reward } = calculateOfflineProgress(saved, elapsed)
       lastEventSlot.current = getHalfHourSlot()
       lastInspectionSlot.current = getInspectionSlot()
-      if (elapsed >= OFFLINE_REWARD_MODAL_THRESHOLD_SECONDS) {
+      if (reward.stoppedByMental || elapsed >= OFFLINE_REWARD_MODAL_THRESHOLD_SECONDS) {
         setOfflineReward(reward)
       }
       setPlayer(updated)
@@ -568,7 +572,10 @@ export function useGameStore({ userId = null }: UseGameStoreOptions = {}) {
     const repBonus = Math.min(20, (player.reputation - nextRank.reputationRequired) * 0.5)
     const politicsBonus = Math.min(10, (player.stats.politics - 1) * 2)
     const moodBonus = KING_MOODS[player.kingMood].promotionBonus
-    const successRate = Math.max(0, Math.min(99, basePct + meritBonus + repBonus + politicsBonus + moodBonus))
+    const isTutorialPromotion = player.rankIndex === 0
+    const successRate = isTutorialPromotion
+      ? 100
+      : Math.max(0, Math.min(99, basePct + meritBonus + repBonus + politicsBonus + moodBonus))
 
     const success = Math.random() * 100 < successRate
     const requiredReputationForCost = nextRank?.reputationRequired ?? DEFAULT_PROMOTION_REPUTATION_COST_BASE
