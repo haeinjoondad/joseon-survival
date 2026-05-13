@@ -3,6 +3,11 @@ import { WORKS } from '../data/works'
 
 const COMPLAINT_REPUTATION_PER_HOUR = 3
 const ROBE_COMPLAINT_REPUTATION_BONUS_PER_LEVEL = 0.02
+const STAT_LABELS = {
+  writing: { emoji: '✍️', label: '필력' },
+  sense: { emoji: '👁️', label: '눈치' },
+  politics: { emoji: '🏛️', label: '정치력' },
+}
 
 interface Props {
   player: Player
@@ -23,6 +28,7 @@ export function WorkPanel({ player, onSetWork, onRecover, onRecoverStamina }: Pr
         const robeEnhancementLevel = Math.max(0, player.equipment.robe - 1)
         const complaintReputationPerHour = COMPLAINT_REPUTATION_PER_HOUR *
           (1 + robeEnhancementLevel * ROBE_COMPLAINT_REPUTATION_BONUS_PER_LEVEL)
+        const growthStat = STAT_LABELS[work.statScaling]
 
         return (
           <button
@@ -44,19 +50,15 @@ export function WorkPanel({ player, onSetWork, onRecover, onRecoverStamina }: Pr
               )}
             </div>
             <p className="text-stone-400 text-xs mb-2">{work.description}</p>
-            {work.id === 'complaint' && (
-              <div className="mb-2 inline-flex items-center gap-1.5 rounded border border-blue-800 bg-blue-950/60 px-2 py-1 text-xs text-blue-300">
-                <span>👥</span>
-                <span>평판 +{complaintReputationPerHour.toFixed(2)}/시간</span>
-                {robeEnhancementLevel > 0 && (
-                  <span className="text-blue-400/80">(관복 +{robeEnhancementLevel * 2}%)</span>
-                )}
-              </div>
-            )}
             <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs">
               <span className="text-amber-300">⚔ +{(work.meritPerSec * parseFloat(bonus)).toFixed(1)}/초</span>
               <span className="text-green-400">💰 +{work.salaryPerSec.toFixed(1)}/초</span>
-              <span className="text-purple-400">멘탈 -{(work.mentalCost / 60).toFixed(2)}/초</span>
+              {work.id === 'complaint' && (
+                <span className="text-blue-400">👥 +{complaintReputationPerHour.toFixed(2)}/시간</span>
+              )}
+              <span className="text-purple-400">🧠 -{work.mentalCost.toFixed(1)}/분</span>
+              <span className="text-red-400">❤️ -{work.staminaCost.toFixed(1)}/분</span>
+              <span className="text-stone-300">{growthStat.emoji} {growthStat.label}</span>
             </div>
           </button>
         )
