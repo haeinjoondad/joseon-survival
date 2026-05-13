@@ -1,6 +1,7 @@
 import type { KingMood } from '../types/game'
 
 export const HALF_HOUR_MS = 30 * 60 * 1000
+export const INSPECTION_OFFSET_MS = 15 * 60 * 1000
 export const LEDGER_MERIT_MULTIPLIER = 3
 export const LEDGER_HEAT_DECAY_PER_SECOND = 0.005
 export const LEDGER_BASE_INSPECTION_CHANCE = 0.05
@@ -59,6 +60,19 @@ export function pickKingMood(): KingMood {
   if (roll < 0.65) return 'calm'
   if (roll < 0.9) return 'irritated'
   return 'furious'
+}
+
+export function getHalfHourSlot(time = Date.now()) {
+  return Math.floor(time / HALF_HOUR_MS)
+}
+
+export function getInspectionSlot(time = Date.now()) {
+  return Math.floor((time - INSPECTION_OFFSET_MS) / HALF_HOUR_MS)
+}
+
+export function getMsToNextInspection(time = Date.now()) {
+  const elapsedSinceInspectionSlot = ((time - INSPECTION_OFFSET_MS) % HALF_HOUR_MS + HALF_HOUR_MS) % HALF_HOUR_MS
+  return HALF_HOUR_MS - elapsedSinceInspectionSlot
 }
 
 export function getLedgerHeatGainPerSecond(ledgerHeat: number) {

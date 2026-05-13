@@ -1,9 +1,9 @@
 import type { Player, WorkType } from '../types/game'
 import { WORKS } from '../data/works'
 import {
-  HALF_HOUR_MS,
   KING_MOODS,
   LEDGER_MERIT_MULTIPLIER,
+  getMsToNextInspection,
   getLedgerInspectionChance,
 } from '../data/balance'
 
@@ -36,7 +36,7 @@ interface Props {
 
 export function WorkPanel({ player, onSetWork, onSetLedgerManipulation, onRecover, onRecoverStamina }: Props) {
   const mood = KING_MOODS[player.kingMood]
-  const msToNextInspection = HALF_HOUR_MS - (Date.now() % HALF_HOUR_MS)
+  const msToNextInspection = getMsToNextInspection()
   const ledgerInspectionChance = player.ledgerManipulation
     ? getLedgerInspectionChance(player.ledgerHeat, player.kingMood)
     : 0
@@ -56,7 +56,7 @@ export function WorkPanel({ player, onSetWork, onSetLedgerManipulation, onRecove
         <div className="flex items-center justify-between gap-3">
           <div>
             <div className="text-hanji text-sm font-bold">📒 장부 조작</div>
-            <div className="text-stone-400 text-xs">공적 x3 · 정각/30분 감찰 위험</div>
+            <div className="text-stone-400 text-xs">공적 x3 · 15분/45분 감찰 위험</div>
           </div>
           <div className={`text-xs font-bold shrink-0 ${player.ledgerManipulation ? 'text-red-300' : 'text-stone-500'}`}>
             {player.ledgerManipulation ? '조작 중' : '꺼짐'}

@@ -5,10 +5,11 @@ import { WORKS } from '../data/works'
 import { RANKS, MAX_RANK_INDEX } from '../data/ranks'
 import { EVENTS, TUTORIAL_EVENT } from '../data/events'
 import {
-  HALF_HOUR_MS,
   KING_MOODS,
   LEDGER_HEAT_DECAY_PER_SECOND,
   LEDGER_MERIT_MULTIPLIER,
+  getHalfHourSlot,
+  getInspectionSlot,
   getLedgerHeatGainPerSecond,
   getLedgerInspectionChance,
   pickKingMood,
@@ -20,6 +21,7 @@ const TICK_MS = 1000
 const MAX_OFFLINE_HOURS = 8
 const OFFLINE_MIN_MENTAL = 10
 const OFFLINE_REWARD_THRESHOLD_SECONDS = 30
+const OFFLINE_REWARD_MODAL_THRESHOLD_SECONDS = 5 * 60
 const MAX_REPUTATION = 100
 const ROBE_REPUTATION_PER_LEVEL_PER_HOUR = 0.25
 const COMPLAINT_REPUTATION_PER_HOUR = 3
@@ -212,7 +214,8 @@ export function useGameStore({ userId = null }: UseGameStoreOptions = {}) {
   const latestPlayerRef = useRef<Player | null>(null)
   const cloudPlayerRef = useRef<Player | null>(null)
   // 마지막으로 이벤트를 발생시킨 30분 슬롯 번호
-  const lastEventSlot = useRef(Math.floor(Date.now() / HALF_HOUR_MS))
+  const lastEventSlot = useRef(getHalfHourSlot())
+  const lastInspectionSlot = useRef(getInspectionSlot())
   // 최근 발생한 이벤트 id 3개 기억 (반복 방지)
   const recentEventIds = useRef<string[]>([])
 
@@ -249,7 +252,9 @@ export function useGameStore({ userId = null }: UseGameStoreOptions = {}) {
       )
       if (elapsed > OFFLINE_REWARD_THRESHOLD_SECONDS) {
         const { updated, reward } = calculateOfflineProgress(saved, elapsed)
-        setOfflineReward(reward)
+        if (elapsed >= OFFLINE_REWARD_MODAL_THRESHOLD_SECONDS) {
+          setOfflineReward(reward)
+        }
         setPlayer(updated)
         persistPlayer(updated)
       } else {
@@ -272,8 +277,11 @@ export function useGameStore({ userId = null }: UseGameStoreOptions = {}) {
       if (elapsed <= OFFLINE_REWARD_THRESHOLD_SECONDS) return
 
       const { updated, reward } = calculateOfflineProgress(saved, elapsed)
-      lastEventSlot.current = Math.floor(Date.now() / HALF_HOUR_MS)
-      setOfflineReward(reward)
+      lastEventSlot.current = getHalfHourSlot()
+      lastInspectionSlot.current = getInspectionSlot()
+      if (elapsed >= OFFLINE_REWARD_MODAL_THRESHOLD_SECONDS) {
+        setOfflineReward(reward)
+      }
       setPlayer(updated)
       persistPlayer(updated)
     }
@@ -343,6 +351,8 @@ export function useGameStore({ userId = null }: UseGameStoreOptions = {}) {
   useEffect(() => {
     if (!player) return
     tickRef.current = setInterval(() => {
+      if (document.visibilityState !== 'visible') return
+
       setPlayer(prev => {
         if (!prev) return prev
         const tickResult = calcTick(prev, 1)
@@ -355,14 +365,14 @@ export function useGameStore({ userId = null }: UseGameStoreOptions = {}) {
         }
 
         // 정각·30분 슬롯이 바뀌면 이벤트 발생 시도
-        const currentSlot = Math.floor(Date.now() / HALF_HOUR_MS)
-        if (currentSlot !== lastEventSlot.current) {
-          lastEventSlot.current = currentSlot
-          const nextMood = pickKingMood()
-          updated = { ...updated, kingMood: nextMood }
+        const now = Date.now()
+        const currentInspectionSlot = getInspectionSlot(now)
+        if (currentInspectionSlot !== lastInspectionSlot.current) {
+          lastInspectionSlot.current = currentInspectionSlot
 
           if (updated.ledgerManipulation) {
-            const inspectionChance = getLedgerInspectionChance(updated.ledgerHeat, nextMood)
+            setActiveEvent(null)
+            const inspectionChance = getLedgerInspectionChance(updated.ledgerHeat, updated.kingMood)
 
             if (Math.random() < inspectionChance) {
               const before = updated
@@ -377,9 +387,9 @@ export function useGameStore({ userId = null }: UseGameStoreOptions = {}) {
                 rankIndex: updated.ledgerHeat >= 70 ? Math.max(0, updated.rankIndex - 1) : updated.rankIndex,
               }
               setEventResult({
-                choiceText: '장부 조작',
+                choiceText: '장부 조작 감찰',
                 success: false,
-                message: '암행어사가 장부의 빈틈을 잡아냈습니다. 조작은 중단되고 자산과 평판이 크게 깎였습니다.',
+                message: '사헌부 감찰이 장부의 빈틈을 잡아냈습니다. 조작은 중단되고 자산과 평판이 크게 깎였습니다.',
                 effects: {
                   공적: Math.floor(updated.merit - before.merit),
                   녹봉: Math.floor(updated.salary - before.salary),
@@ -388,8 +398,23 @@ export function useGameStore({ userId = null }: UseGameStoreOptions = {}) {
                   ...(updated.rankIndex < before.rankIndex ? { 품계: -1 } : {}),
                 },
               })
+            } else {
+              setEventResult({
+                choiceText: '장부 조작 감찰',
+                success: true,
+                message: `사헌부 감찰이 지나갔지만 꼬리는 잡히지 않았습니다. 이번 감찰 위험은 ${Math.floor(inspectionChance * 100)}%였습니다.`,
+                effects: {},
+              })
             }
           }
+        }
+
+        const currentSlot = getHalfHourSlot(now)
+        if (currentSlot !== lastEventSlot.current) {
+          lastEventSlot.current = currentSlot
+
+          const nextMood = pickKingMood()
+          updated = { ...updated, kingMood: nextMood }
 
           setActiveEvent(current => {
             if (current) return current  // 이미 이벤트 중이면 유지
