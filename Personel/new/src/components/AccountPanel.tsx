@@ -1,9 +1,12 @@
+import { useState } from 'react'
+import type { ReactNode } from 'react'
 import type { User } from '@supabase/supabase-js'
 
 interface Props {
   user: User | null
   conflict: boolean
   cloudStatus: string | null
+  authPanel?: ReactNode
   onUseGuestSave: () => void
   onUseCloudSave: () => void
   onSignOut: () => void
@@ -13,11 +16,32 @@ export function AccountPanel({
   user,
   conflict,
   cloudStatus,
+  authPanel,
   onUseGuestSave,
   onUseCloudSave,
   onSignOut,
 }: Props) {
-  if (!user) return null
+  const [isAuthOpen, setIsAuthOpen] = useState(false)
+
+  if (!user) {
+    return (
+      <div className="bg-stone-900 border-b border-stone-700 px-4 py-2">
+        <button
+          onClick={() => setIsAuthOpen(open => !open)}
+          className="w-full flex items-center justify-between gap-3 text-left"
+        >
+          <div className="min-w-0">
+            <div className="text-stone-500 text-xs">게스트 진행 중</div>
+            <div className="text-amber-300 text-xs font-bold">계정을 만들면 현재 진행도를 저장할 수 있습니다</div>
+          </div>
+          <span className="text-stone-400 text-xs border border-stone-700 rounded px-2 py-1 shrink-0">
+            {isAuthOpen ? '닫기' : '계정 저장'}
+          </span>
+        </button>
+        {isAuthOpen && authPanel}
+      </div>
+    )
+  }
 
   return (
     <div className="bg-stone-900 border-b border-stone-700 px-4 py-2">

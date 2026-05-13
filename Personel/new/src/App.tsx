@@ -151,6 +151,15 @@ export default function App() {
         user={auth.user}
         conflict={saveConflict}
         cloudStatus={cloudStatus}
+        authPanel={
+          <AuthPanel
+            disabled={auth.loading}
+            error={auth.authError}
+            isConfigured={auth.isConfigured}
+            onSignIn={auth.signIn}
+            onSignUp={auth.signUp}
+          />
+        }
         onUseGuestSave={useGuestSaveForAccount}
         onUseCloudSave={useAccountSave}
         onSignOut={() => { void auth.signOut() }}
